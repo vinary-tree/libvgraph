@@ -1,8 +1,9 @@
 # libvgraph
 
 libvgraph is the formally specified, deterministic structural-graph substrate for Vinary projects.
-Its production refinement remains gated by machine-checked semantics, explicit work and heap
-bounds, exhaustive independent oracles, and documentation verification.
+It provides a production Rust implementation backed by machine-checked semantics, explicit work
+and heap bounds, exhaustive independent oracles, bounded model checking, and documentation
+verification.
 
 The first contract covers canonical compressed sparse row (CSR) graphs, strongly connected
 component (SCC) quotients, condensation directed acyclic graphs (DAGs), and dependency wavefronts.
@@ -21,18 +22,20 @@ ordering cost is never conflated with graph-analysis complexity.
 - [Exhaustive validation method](docs/science/exhaustive-validation.md)
 - [Implementation refinement matrix](docs/engineering/refinement-matrix.md)
 - [Resource and input safety](docs/security/resource-safety.md)
+- [Rust API and usage](docs/usage/rust-api.md)
+- [Performance and deterministic concurrency](docs/engineering/performance-and-concurrency.md)
 - [Verification workflow](docs/usage/verification-workflow.md)
 - [Formal verification guide](formal/README.md)
 - [Diagram catalog](docs/diagrams/README.md)
 
-Run `scripts/verify-formal.sh` before adding production code. Run
-`scripts/verify-docs.sh` for every documentation update.
+Run `scripts/verify-formal.sh all` before changing production semantics. The runner places every
+heavy proof layer in an explicit no-swap systemd memory scope. Run `scripts/verify-docs.sh` for
+every documentation update.
 
 ## Status
 
-The strengthened formal contract is tracked by pgmcp task `vco-e2-formal-contracts`. The
-production task `vco-e2-kernel-implementation` remains blocked until the stack-safety and
-complexity refinements are checked and recorded.
+The strengthened formal contract is tracked by pgmcp task `vco-e2-formal-contracts`. Production
+implementation and refinement closeout are tracked by `vco-e2-kernel-implementation`.
 
 ## License
 

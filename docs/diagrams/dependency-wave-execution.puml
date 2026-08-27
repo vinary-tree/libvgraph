@@ -1,0 +1,41 @@
+@startuml
+skinparam backgroundColor #F8FAFC
+skinparam defaultFontName DejaVu Sans
+skinparam shadowing false
+skinparam ArrowColor #334155
+skinparam ArrowThickness 2
+skinparam rectangle {
+  BorderColor #334155
+  FontColor #0F172A
+}
+
+title Deterministic dependency-wave execution
+
+rectangle "Verified serial planner\ncanonical condensation and ranks" as planner #DBEAFE
+rectangle "Wave 0\nisolated component tasks\nstable IDs" as wave0 #C4B5FD
+rectangle "Barrier 0\nall tasks complete" as barrier0 #FDE68A
+rectangle "Ordered commit 0\nascending component ID" as commit0 #A7F3D0
+rectangle "Wave 1\nisolated component tasks\nstable IDs" as wave1 #C4B5FD
+rectangle "Barrier 1\nall tasks complete" as barrier1 #FDE68A
+rectangle "Ordered commit 1\nascending component ID" as commit1 #A7F3D0
+rectangle "Canonical result\nworker-count independent" as result #FBCFE8
+
+planner -[#2563EB,bold]-> wave0 : release rank 0
+wave0 -[#7C3AED,bold]-> barrier0 : concurrent completion
+barrier0 -[#D97706,bold]-> commit0 : collect by stable ID
+commit0 -[#059669,bold]-> wave1 : publish dependencies
+wave1 -[#7C3AED,bold]-> barrier1 : concurrent completion
+barrier1 -[#D97706,bold]-> commit1 : collect by stable ID
+commit1 -[#059669,bold]-> result : deterministic publication
+
+note bottom of wave0 #EDE9FE
+  No direct condensation edge joins
+  two components in the same wave.
+  Task-local mutation is isolated.
+end note
+
+note bottom of result #FCE7F3
+  Varying worker counts and completion order
+  must not change canonical output bytes.
+end note
+@enduml

@@ -21,6 +21,13 @@ The formal artifacts precede production implementation.
   closure, checks every vertex permutation together with its induced condensation and ranks, and
   constructs flat wave offsets/members with exact work and constant-buffer checks, and runs a
   20,000-vertex small-stack lifecycle.
+- `verus/flat_wave_refinement.rs` proves rank-fiber totality and disjointness, flat-wave storage
+  linearity, exact schedule charging, unsigned 64-bit fit in the graph domain, and the uniform
+  phase-complete pipeline bound.
+- The `#[cfg(kani)]` harnesses in `src/radix.rs`, `src/control.rs`, and `src/condensation.rs`
+  execute concrete production functions symbolically. They prove pair encoding round trips,
+  radix-work arithmetic cannot overflow in the graph domain, work admission is fail-atomic, and
+  the flat-wave buffers are sorted exact rank fibers for the bounded harness domain.
 
 Run:
 
@@ -28,6 +35,10 @@ Run:
 scripts/verify-formal.sh
 ```
 
-The default command compiles Rocq in a resource-limited user scope, validates TLA+ syntax and the
-TLC model, and compiles/runs the exhaustive oracle. It writes transient evidence below
-`target/verification`; record hashes and results in pgmcp before deleting that directory.
+The default command checks all five layers. Each layer runs in a transient systemd user scope with
+`MemorySwapMax=0`, one Cargo build job, and an explicit resident-memory ceiling. Rocq, TLA+/TLC,
+the exhaustive model, and Verus receive 4 GiB; Kani/CBMC receives 2 GiB. A cap hit is a failed
+proof gate and must be addressed by reducing verifier state, not by silently increasing the cap.
+
+The command writes transient evidence below `target/verification`. Record commands, versions,
+result summaries, peak memory, and SHA-256 hashes in pgmcp before deleting those files.

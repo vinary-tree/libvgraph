@@ -24,6 +24,10 @@ tests alone is insufficient unless those tests exercise the mapped obligation be
 | Phase-complete linear work | Counted work includes initialization, flat fibers, exact radix preparation/passes/deduplication, paired condensation CSR, and flat wave materialization; it is at most $`27\lvert V\rvert + 20\lvert E\rvert + 26{,}628`$ |
 | Complete auxiliary space | Reusable temporary storage is at most $`9\lvert V\rvert + 2\lvert E\rvert + 2{,}048`$ slots, excluding returned values |
 | Cancellation and limits | Exhaustion returns a structured incomplete result and never certifies exact completion |
+| Flat schedule allocation | `schedule_impl` performs a constant number of allocations independent of the wave count; no wave owns a nested vector |
+| Versioned serialization | Feature-gated deserialization accepts format version 1 only and routes every decoded CSR through `try_from_parts` before traversal |
+| Concrete arithmetic safety | Kani proves pair encoding, radix charge arithmetic, fail-atomic work admission, and bounded production flat-wave materialization |
+| General arithmetic refinement | Verus proves flat storage and schedule/pipeline work bounds for arbitrary natural-number parameters satisfying the graph inequalities |
 
 ## Malformed-representation matrix
 
@@ -50,7 +54,9 @@ evidence is reused. Only new or materially refactored paths receive new performa
 
 ## Evidence handling
 
-Verification commands write transient logs below `target/verification`. Record command lines,
-tool versions, result summaries, and SHA-256 hashes in pgmcp. Remove transient binaries and logs
-after the evidence record is durable; committed proof, model, test, documentation, and diagram
-sources remain the reproducible authority.
+Verification commands write transient logs below `target/verification`. Every heavy command must
+run in a systemd scope with `MemorySwapMax=0` and an explicit `MemoryMax`; record the cap and
+observed peak resident memory with command lines, tool versions, result summaries, and SHA-256
+hashes in pgmcp. Remove transient binaries and logs after the evidence record is durable;
+committed proof, model, test, documentation, and diagram sources remain the reproducible
+authority.

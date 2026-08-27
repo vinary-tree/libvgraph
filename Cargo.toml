@@ -1,0 +1,43 @@
+[package]
+name = "libvgraph"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+authors = ["Dylon Edwards <dylon@f1r3fly.io>"]
+description = "Deterministic, stack-safe CSR, SCC, condensation, and wavefront kernel"
+license = "Apache-2.0"
+repository = "https://github.com/vinary-tree/libvgraph"
+keywords = ["graph", "csr", "scc", "deterministic", "scheduling"]
+categories = ["algorithms", "data-structures"]
+publish = false
+
+[workspace]
+members = ["."]
+exclude = ["conformance/libcpg"]
+resolver = "2"
+
+[features]
+default = []
+serde = ["dep:serde"]
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"], optional = true }
+
+[dev-dependencies]
+criterion = "0.5.1"
+petgraph = "0.7.1"
+proptest = "1.9.0"
+serde_json = "1.0.151"
+
+[[bench]]
+name = "kernel"
+harness = false
+
+[lints.rust]
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+
+[lints.clippy]
+all = "deny"
+pedantic = "deny"
+unwrap_used = "deny"

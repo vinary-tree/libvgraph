@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document fixes the boundary between verified semantics and future implementation choices.
+This document fixes the boundary between verified semantics and implementation choices.
 A **formal contract** is a machine-checked mathematical or state-transition specification. A
 **refinement** is evidence that a concrete implementation preserves the observations of that
 contract.
@@ -16,10 +16,12 @@ contract.
 | Relational and resource semantics | `formal/rocq/GraphQuotient.v` | Fibers, quotient edges, acyclicity, renaming, enumeration, wavefront laws, exact logical work, linear heap space, and constant native control depth |
 | Lifecycle model | `formal/tla/IterativeGraphMachine.tla` | Explicit frames, bounded frame count, exact discovery/edge/frame accounting, linear work, completion, and cancellation |
 | Exhaustive oracle | `formal/model/exhaustive_graphs.rs` | Canonical forward/reverse CSR, every graph through four vertices, independent SCC oracle, all renamings, induced condensation/rank/flat-wave equivalence, adversarial enumerations, exact work and returned-buffer counters, and a small-stack deep graph |
-| Production refinement | Rust tests and verifier harnesses | CSR validation, iterative Tarjan parity, stable ordering, malformed-input behavior, measured work/allocation bounds, recursion census, and small-stack lifecycle |
+| Arithmetic refinement | `formal/verus/flat_wave_refinement.rs` | Rank-fiber partition laws, flat storage, exact schedule work, integer-domain safety, and the phase-complete uniform bound |
+| Production refinement | Rust tests and Kani harnesses | CSR validation, iterative Tarjan parity, stable ordering, malformed-input behavior, concrete overflow and fail-atomic checks, measured work/allocation bounds, recursion census, and small-stack lifecycle |
 
-The first three layers precede production implementation. The fourth is required before the
-implementation task can be verified.
+The first three layers preceded production implementation. Verus and Kani connect the general
+resource contract and concrete Rust operations during refinement. Every layer is required for the
+complete gate.
 
 ## Public boundary reserved by the contract
 
@@ -38,7 +40,7 @@ contract.
 
 ## Refinement checklist
 
-A future implementation is admitted only when all answers are “yes.”
+An implementation release is admitted only when all answers are “yes.”
 
 1. Does construction preserve the extensional edge relation after sorting and duplicate removal?
 2. Does validation reject every malformed offset, endpoint, reverse-edge, and payload alignment?
@@ -50,7 +52,8 @@ A future implementation is admitted only when all answers are “yes.”
    the public operation applies?
 8. Are caps, cancellation, malformed input, and overflow explicit rather than reported as success?
 9. Do serial and future parallel paths produce the same canonical output?
-10. Do Rocq, TLC, the exhaustive oracle, Rust tests, strict lint, and documentation lint all pass?
+10. Do Rocq, TLC, the exhaustive oracle, Verus, Kani, Rust tests, strict lint, and documentation
+    lint all pass inside their resource scopes?
 11. On canonical CSR, does SCC work equal $`5|V| + |E|`$ logical events and stay within
     $`5|V|`$ auxiliary vertex slots, excluding returned output?
 12. Does phase-complete charging include safe workspace initialization, flat fiber

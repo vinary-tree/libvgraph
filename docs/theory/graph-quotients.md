@@ -130,7 +130,7 @@ Tarjan rather than repeating an already-settled Tarjan-versus-Kosaraju compariso
 
 ## Representation refinement
 
-The mathematical graph is a relation, not an iteration order. The future Rust kernel may use
+The mathematical graph is a relation, not an iteration order. The Rust kernel uses
 dense integer identifiers and CSR arrays, provided its validator establishes:
 
 - stable vertices are strictly ordered and unique;
@@ -148,7 +148,8 @@ compare the commuting square, not demand accidental numeric-ID equality.
 
 ## Literate algorithm
 
-The pre-implementation model follows this pseudocode. Canonicalization is deliberately first:
+The production algorithm and its pre-implementation model follow this pseudocode.
+Canonicalization is deliberately first:
 all later algorithms consume one extensional graph rather than caller-controlled enumeration
 order.
 
