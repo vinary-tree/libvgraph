@@ -1,0 +1,41 @@
+@startuml
+skinparam backgroundColor #F7FAFC
+skinparam defaultFontName DejaVu Sans
+skinparam ArrowColor #334155
+skinparam ArrowThickness 2
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+title SCC quotient map and fibers
+
+package "Source graph V" #DBEAFE {
+  rectangle "vertex 0" as v0 #BFDBFE
+  rectangle "vertex 1" as v1 #BFDBFE
+  rectangle "vertex 2" as v2 #DCFCE7
+  rectangle "vertex 3" as v3 #FEF3C7
+  v0 -[#2563EB]-> v1
+  v1 -[#2563EB]-> v0
+  v1 -[#16A34A]-> v2
+  v2 -[#D97706]-> v3
+}
+
+package "Component set C" #F1F5F9 {
+  rectangle "c0\nfiber {0, 1}" as c0 #93C5FD
+  rectangle "c1\nfiber {2}" as c1 #86EFAC
+  rectangle "c2\nfiber {3}" as c2 #FCD34D
+  c0 -[#16A34A,bold]-> c1 : condensation
+  c1 -[#D97706,bold]-> c2 : condensation
+}
+
+v0 ..[#64748B]-> c0 : q
+v1 ..[#64748B]-> c0 : q
+v2 ..[#64748B]-> c1 : q
+v3 ..[#64748B]-> c2 : q
+
+legend right
+  |= Color |= Meaning |
+  |<#93C5FD> blue | one strongly connected fiber |
+  |<#86EFAC> green | downstream singleton fiber |
+  |<#FCD34D> amber | terminal singleton fiber |
+endlegend
+@enduml
