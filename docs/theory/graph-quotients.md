@@ -51,8 +51,9 @@ lifecycle, its frame bound, and exact operational work accounting.
 
 Let $`|V|`$ be the canonical vertex count, $`|E|`$ the canonical edge count, $`|R|`$ the number
 of cross-component edge candidates before quotient deduplication, $`|C|`$ the strongly connected
-component (SCC) count, and $`|Q|`$ the distinct condensation-edge count. A complete explicit-frame
-Tarjan trace performs exactly:
+component (SCC) count, $`|Q|`$ the distinct condensation-edge count, $`|W|`$ the number of
+nonempty dependency waves, and $`B = 2{,}048`$ the radix bucket count. A complete explicit-frame
+Tarjan semantic trace performs exactly:
 
 ```math
 |V|_{\mathrm{roots}} + |V|_{\mathrm{discoveries}} + |E|_{\mathrm{edges}} +
@@ -60,40 +61,68 @@ Tarjan trace performs exactly:
 |V|_{\mathrm{canonical\ assignments}} = 5|V| + |E|.
 ```
 
+This identity describes Tarjan’s semantic events, not all representation work. Phase-complete
+charging additionally includes safe vector initialization and flat, sorted fiber materialization.
+The cost model charges one unit for each explicit loop iteration and each element initialized by an
+input-dependent bulk operation. Capacity reservation without element initialization is governed by
+memory limits and is not charged as loop work.
+
 The discovery, low-link, and raw-component arrays each contain $`|V|`$ slots. The active stack
 and explicit frame stack each peak at no more than $`|V|`$ entries. Excluding returned output,
-the SCC auxiliary bound is therefore $`5|V|`$ vertex-sized slots. The implementation has no
-recursive control edge; graph depth changes heap-vector lengths, not native call depth.
+the Tarjan-only auxiliary bound is therefore $`5|V|`$ vertex-sized slots. The implementation has
+no recursive control edge; graph depth changes heap-vector lengths, not native call depth.
 
-Exact quotient construction scans source edges once. Its nonrecursive least-significant-digit
-radix canonicalizer uses six 11-bit passes over 64-bit component pairs and $`2{,}048`$ buckets.
-Each full pass scans the candidates twice and the bucket array twice: once to clear counts and once
-to form prefixes. Deduplication adds one candidate scan. The fewer-than-two-candidates fast path
-does no radix work, so its exact logical cost is:
+The nonrecursive least-significant-digit radix canonicalizer uses six 11-bit passes over 64-bit
+component pairs. Before a full sort, its deterministic charge includes safe initialization of
+$`|R|`$ scratch elements and $`B`$ bucket elements. Each pass scans candidates twice and buckets
+twice: once to clear counts and once to form prefixes. Deduplication adds one candidate scan. The
+fewer-than-two-candidates fast path performs none of this work, so the exact charged cost is:
 
 ```math
 W_{\mathrm{radix}}(|R|) =
 \begin{cases}
 0, & |R| < 2, \\
-6(2|R| + 2(2{,}048)) + |R|
-  = 13|R| + 24{,}576, & |R| \ge 2.
+(|R| + B) + 6(2|R| + 2B) + |R|
+  = 14|R| + 13B, & |R| \ge 2.
 \end{cases}
 ```
 
-Linear wavefront construction initializes, removes, and assigns each component once and scans
-each quotient edge once. The complete exact expression is therefore
-$`5|V| + 2|E| + W_{\mathrm{radix}}(|R|) + 3|C| + |Q|`$. Because $`|R| \le |E|`$,
-$`|C| \le |V|`$, and $`|Q| \le |E|`$, its uniform upper bound is:
+The remaining phase charges are explicit:
+
+| Phase | Exact charged work | Included operations |
+|---|---:|---|
+| SCC partition | $`10\lvert V\rvert + \lvert E\rvert + 3\lvert C\rvert + 1`$ | Workspace initialization, Tarjan trace, canonical map, flat sorted fibers |
+| Quotient source scan | $`\lvert E\rvert`$ | Cycle flags and cross-component candidates |
+| Condensation CSR | $`5\lvert C\rvert + 3\lvert Q\rvert + 2`$ | Paired forward/reverse offsets, prefixes, targets, reverse fill, offset restoration |
+| Wavefront schedule | $`4\lvert C\rvert + \lvert Q\rvert + \lvert W\rvert`$ | Indegrees, ranks, removals, quotient-edge scan, wave containers, assignments |
+
+Consequently, the phase-complete exact charge is:
 
 ```math
-5|V| + 2|E| + W_{\mathrm{radix}}(|R|) + 3|C| + |Q|
-\le 8|V| + 16|E| + 24{,}576.
+10|V| + 2|E| + W_{\mathrm{radix}}(|R|) + 12|C| + 4|Q| + |W| + 3.
+```
+
+Because $`|R| \le |E|`$, $`|C| \le |V|`$, $`|Q| \le |E|`$,
+$`|W| \le |C|`$, and $`13B = 26{,}624`$, the uniform upper bound is:
+
+```math
+10|V| + 2|E| + W_{\mathrm{radix}}(|R|) + 12|C| + 4|Q| + |W| + 3
+\le 23|V| + 20|E| + 26{,}627.
+```
+
+Reusable temporary storage retains five Tarjan vertex arrays or stacks, five component-sized
+arrays or queues, the candidate and radix scratch vectors, and the fixed bucket array. Returned
+partition, condensation, and schedule values are excluded. Its bound is:
+
+```math
+5|V| + 5|C| + 2|R| + B \le 10|V| + 2|E| + 2{,}048.
 ```
 
 ![Linear work and heap bounds across the canonical pipeline](../diagrams/linear-work-bound.svg)
 
-These are logical loop-iteration bounds, not instruction counts or wall-clock predictions. The
-radix bound exposes both fixed bucket scans instead of hiding them in asymptotic notation.
+These are charged logical loop and bulk-initialization bounds, not instruction counts or wall-clock
+predictions. The formulas expose workspace preparation, returned-representation construction,
+both fixed bucket scans, and wave-container creation instead of hiding them in asymptotic notation.
 Production acceptance also measures cache misses, allocations, peak resident memory, and
 throughput on relevant Vinary workloads. It reuses libcpg's established choice of iterative
 Tarjan rather than repeating an already-settled Tarjan-versus-Kosaraju comparison.

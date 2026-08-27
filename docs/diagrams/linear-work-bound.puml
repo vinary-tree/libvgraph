@@ -13,19 +13,30 @@ title libvgraph canonical-path work and heap contract
 
 rectangle "Validated canonical CSR\n<latex>|V|</latex> vertices; <latex>|E|</latex> edges" as csr #DBEAFE
 rectangle "Explicit-frame Tarjan\n<latex>5|V| + |E|</latex> exact events\n<latex>\leq 5|V|</latex> auxiliary vertex slots" as scc #C4B5FD
-rectangle "Exact quotient\none source-edge scan\nsix 11-bit radix passes\n<latex>W_R=0</latex> if <latex>|R|<2</latex>\notherwise <latex>W_R=13|R|+24576</latex>" as quotient #A7F3D0
-rectangle "Ranks and waves\n<latex>3|C| + |Q|</latex> events" as waves #FDE68A
-rectangle "Composed exact work\n<latex>5|V| + 2|E| + W_R + 3|C| + |Q|</latex>\nupper bound <latex>\leq 8|V| + 16|E| + 24576</latex>" as bound #FBCFE8
+rectangle "Partition materialization\nworkspace initialization and flat fibers\n<latex>10|V|+|E|+3|C|+1</latex>" as partition #DDD6FE
+rectangle "Quotient canonicalization\none source-edge scan plus radix\n<latex>W_R=0</latex> if <latex>|R|<2</latex>\notherwise <latex>W_R=14|R|+26624</latex>" as quotient #A7F3D0
+rectangle "Paired condensation CSR\n<latex>5|C|+3|Q|+2</latex>" as condensation #99F6E4
+rectangle "Ranks and waves\n<latex>4|C|+|Q|+|W|</latex>" as waves #FDE68A
+rectangle "Phase-complete exact charge\n<latex>10|V|+2|E|+W_R+12|C|+4|Q|+|W|+3</latex>\nupper bound <latex>\leq23|V|+20|E|+26627</latex>" as bound #FBCFE8
 
 csr -[#2563EB,bold]-> scc : scan each CSR edge once
-scc -[#7C3AED,bold]-> quotient : total component map
-quotient -[#059669,bold]-> waves : canonical DAG
-waves -[#D97706,bold]-> bound : <latex>|R|\leq|E|,\ |C|\leq|V|,\ |Q|\leq|E|</latex>
+scc -[#7C3AED,bold]-> partition : canonical component map
+partition -[#6D28D9,bold]-> quotient : total flat fibers
+quotient -[#059669,bold]-> condensation : sorted distinct pairs
+condensation -[#0D9488,bold]-> waves : canonical DAG
+waves -[#D97706,bold]-> bound : <latex>|R|\leq|E|,\ |C|\leq|V|,\ |Q|\leq|E|,\ |W|\leq|C|</latex>
 
 note bottom of scc #EDE9FE
   No recursive control edge.
   Graph depth changes heap vectors,
   never native call depth.
+end note
+
+note bottom of bound #FCE7F3
+  Reusable temporary slots:
+  <latex>5|V|+5|C|+2|R|+2048</latex>
+  <latex>\leq10|V|+2|E|+2048</latex>.
+  Returned values are excluded.
 end note
 
 legend right
@@ -35,5 +46,6 @@ legend right
   | <latex>R</latex> | cross-component candidates |
   | <latex>C</latex> | SCC components |
   | <latex>Q</latex> | distinct quotient edges |
+  | <latex>W</latex> | nonempty dependency waves |
 endlegend
 @enduml

@@ -478,12 +478,13 @@ Definition quotient_radix_bucket_count : nat := 2048.
 
 Definition quotient_radix_pass_count : nat := 6.
 
-Definition quotient_radix_fixed_work : nat :=
-  quotient_radix_pass_count * (2 * quotient_radix_bucket_count).
+Definition quotient_radix_workspace_work (candidate_count : nat) : nat :=
+  candidate_count + quotient_radix_bucket_count.
 
 Definition quotient_radix_work (candidate_count : nat) : nat :=
   if candidate_count <? 2 then 0
   else
+    quotient_radix_workspace_work candidate_count +
     quotient_radix_pass_count *
       (2 * candidate_count + 2 * quotient_radix_bucket_count) +
     candidate_count.
@@ -504,10 +505,10 @@ Theorem quotient_radix_work_full_exact :
   forall candidate_count,
     2 <= candidate_count ->
     quotient_radix_work candidate_count =
-      13 * candidate_count + quotient_radix_fixed_work.
+      14 * candidate_count + 13 * quotient_radix_bucket_count.
 Proof.
   intros candidate_count Hfull.
-  unfold quotient_radix_work, quotient_radix_fixed_work,
+  unfold quotient_radix_work, quotient_radix_workspace_work,
     quotient_radix_pass_count.
   destruct (candidate_count <? 2) eqn:Hsmall.
   - apply Nat.ltb_lt in Hsmall.
@@ -518,7 +519,7 @@ Qed.
 Theorem quotient_radix_work_upper_bound :
   forall candidate_count,
     quotient_radix_work candidate_count <=
-      13 * candidate_count + quotient_radix_fixed_work.
+      14 * candidate_count + 13 * quotient_radix_bucket_count.
 Proof.
   intros candidate_count.
   destruct (candidate_count <? 2) eqn:Hsmall.
@@ -530,39 +531,90 @@ Proof.
     lia.
 Qed.
 
-(** The complete quotient and linear-wavefront pipeline adds one source-edge
-    scan, the exact radix cost above, one scan per distinct quotient edge, and
-    three visits per component (indegree initialization, ready removal, and
-    wave assignment) to the exact Tarjan cost. *)
+(** The partition charge includes safe workspace initialization, the exact
+    Tarjan trace, canonical component mapping, and flat sorted-fiber
+    materialization. The Tarjan trace remains exactly [5V + E] within this
+    larger phase-complete charge. *)
+Definition scc_partition_work
+    (vertex_count edge_count component_count : nat) : nat :=
+  10 * vertex_count + edge_count + 3 * component_count + 1.
+
+(** Canonical forward and reverse condensation CSR are built together. Two
+    offset arrays are initialized, both prefix sums are formed, forward targets
+    are emitted during one quotient-edge scan, reverse targets are initialized
+    and filled during a reverse scan, and reverse offsets are restored in place. *)
+Definition condensation_csr_work
+    (component_count quotient_edge_count : nat) : nat :=
+  5 * component_count + 3 * quotient_edge_count + 2.
+
+(** Scheduling initializes indegrees and ranks, removes every component once,
+    scans every quotient edge once, initializes every nonempty wave, and assigns
+    every component to one wave. *)
+Definition wavefront_work
+    (component_count quotient_edge_count wave_count : nat) : nat :=
+  4 * component_count + quotient_edge_count + wave_count.
+
+(** The phase-complete pipeline comprises partition materialization, one source
+    edge scan for cycle flags and quotient candidates, radix canonicalization,
+    forward/reverse condensation CSR construction, and wavefront scheduling. *)
 Definition quotient_wavefront_work
     (vertex_count edge_count candidate_count component_count
-      quotient_edge_count : nat) : nat :=
-  5 * vertex_count + 2 * edge_count +
+      quotient_edge_count wave_count : nat) : nat :=
+  scc_partition_work vertex_count edge_count component_count +
+  edge_count +
   quotient_radix_work candidate_count +
-  3 * component_count + quotient_edge_count.
+  condensation_csr_work component_count quotient_edge_count +
+  wavefront_work component_count quotient_edge_count wave_count.
 
 Record quotient_dimensions
     (vertex_count edge_count candidate_count component_count
-      quotient_edge_count : nat) : Prop := {
+      quotient_edge_count wave_count : nat) : Prop := {
   candidate_count_bounded : candidate_count <= edge_count;
   component_count_bounded : component_count <= vertex_count;
-  quotient_edge_count_bounded : quotient_edge_count <= edge_count
+  quotient_edge_count_bounded : quotient_edge_count <= edge_count;
+  wave_count_bounded : wave_count <= component_count
 }.
 
 Theorem quotient_wavefront_work_linear :
   forall vertex_count edge_count candidate_count component_count
-    quotient_edge_count,
+    quotient_edge_count wave_count,
     quotient_dimensions vertex_count edge_count candidate_count component_count
-      quotient_edge_count ->
+      quotient_edge_count wave_count ->
     quotient_wavefront_work vertex_count edge_count candidate_count component_count
-      quotient_edge_count <=
-        8 * vertex_count + 16 * edge_count + quotient_radix_fixed_work.
+      quotient_edge_count wave_count <=
+        23 * vertex_count + 20 * edge_count +
+        13 * quotient_radix_bucket_count + 3.
 Proof.
   intros vertex_count edge_count candidate_count component_count
-    quotient_edge_count Hdimensions.
+    quotient_edge_count wave_count Hdimensions.
   destruct Hdimensions.
   pose proof (quotient_radix_work_upper_bound candidate_count) as Hradix.
-  unfold quotient_wavefront_work.
+  unfold quotient_wavefront_work, scc_partition_work,
+    condensation_csr_work, wavefront_work.
+  lia.
+Qed.
+
+(** Excluding returned partition, condensation, and schedule values, the
+    reusable pipeline workspace retains the five Tarjan vertex arrays/stacks,
+    five component-sized temporary arrays/queues, candidate and radix scratch
+    vectors, and one fixed radix bucket array. *)
+Definition pipeline_auxiliary_slots
+    (vertex_count candidate_count component_count : nat) : nat :=
+  5 * vertex_count + 5 * component_count +
+  2 * candidate_count + quotient_radix_bucket_count.
+
+Theorem pipeline_auxiliary_slots_linear :
+  forall vertex_count edge_count candidate_count component_count
+    quotient_edge_count wave_count,
+    quotient_dimensions vertex_count edge_count candidate_count component_count
+      quotient_edge_count wave_count ->
+    pipeline_auxiliary_slots vertex_count candidate_count component_count <=
+      10 * vertex_count + 2 * edge_count + quotient_radix_bucket_count.
+Proof.
+  intros vertex_count edge_count candidate_count component_count
+    quotient_edge_count wave_count Hdimensions.
+  destruct Hdimensions.
+  unfold pipeline_auxiliary_slots.
   lia.
 Qed.
 
@@ -589,3 +641,4 @@ Print Assumptions quotient_radix_work_small_exact.
 Print Assumptions quotient_radix_work_full_exact.
 Print Assumptions quotient_radix_work_upper_bound.
 Print Assumptions quotient_wavefront_work_linear.
+Print Assumptions pipeline_auxiliary_slots_linear.
