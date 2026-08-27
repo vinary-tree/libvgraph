@@ -381,6 +381,96 @@ fn topological_levels(component_count: usize, edges: &BTreeSet<(usize, usize)>) 
     levels
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct FlatWaveSchedule {
+    offsets: Vec<usize>,
+    members: Vec<usize>,
+    materialization_work: usize,
+}
+
+impl FlatWaveSchedule {
+    const RETURNED_BUFFER_COUNT: usize = 2;
+
+    fn from_levels(levels: &[usize]) -> Self {
+        let component_count = levels.len();
+        let wave_count = levels
+            .iter()
+            .copied()
+            .max()
+            .map_or(0, |maximum| maximum + 1);
+
+        let mut offsets = vec![0usize; wave_count + 1];
+        let mut materialization_work = offsets.len();
+        for &wave in levels {
+            assert!(wave < wave_count);
+            offsets[wave + 1] += 1;
+            materialization_work += 1;
+        }
+        for wave in 0..wave_count {
+            offsets[wave + 1] += offsets[wave];
+            materialization_work += 1;
+        }
+
+        let mut members = vec![usize::MAX; component_count];
+        materialization_work += members.len();
+        for component in (0..component_count).rev() {
+            let cursor = &mut offsets[levels[component] + 1];
+            *cursor -= 1;
+            members[*cursor] = component;
+            materialization_work += 1;
+        }
+
+        for wave in 0..wave_count {
+            offsets[wave] = offsets[wave + 1];
+            materialization_work += 1;
+        }
+        offsets[wave_count] = component_count;
+
+        Self {
+            offsets,
+            members,
+            materialization_work,
+        }
+    }
+
+    fn wave_count(&self) -> usize {
+        self.offsets.len() - 1
+    }
+
+    fn wave(&self, wave: usize) -> &[usize] {
+        &self.members[self.offsets[wave]..self.offsets[wave + 1]]
+    }
+
+    fn is_valid_for(&self, levels: &[usize]) -> bool {
+        let component_count = levels.len();
+        let wave_count = self.wave_count();
+        if self.offsets.first() != Some(&0)
+            || self.offsets.last() != Some(&component_count)
+            || self.members.len() != component_count
+            || self.offsets.windows(2).any(|pair| pair[0] > pair[1])
+            || (component_count == 0 && wave_count != 0)
+            || (component_count != 0 && wave_count == 0)
+        {
+            return false;
+        }
+
+        let mut seen = vec![false; component_count];
+        for wave in 0..wave_count {
+            let members = self.wave(wave);
+            if members.is_empty() || !members.windows(2).all(|pair| pair[0] < pair[1]) {
+                return false;
+            }
+            for &component in members {
+                if component >= component_count || seen[component] || levels[component] != wave {
+                    return false;
+                }
+                seen[component] = true;
+            }
+        }
+        seen.into_iter().all(|member_seen| member_seen)
+    }
+}
+
 fn permutations(vertex_count: usize) -> Vec<Vec<usize>> {
     fn extend(prefix: &mut Vec<usize>, remaining: &mut Vec<usize>, output: &mut Vec<Vec<usize>>) {
         if remaining.is_empty() {
@@ -453,6 +543,13 @@ fn verify_graph(vertex_count: usize, edges: &[(usize, usize)], rename_cases: &mu
 
     let condensation = condensation_edges(&adjacency, &tarjan);
     let levels = topological_levels(tarjan.len(), &condensation);
+    let waves = FlatWaveSchedule::from_levels(&levels);
+    assert!(waves.is_valid_for(&levels));
+    assert_eq!(FlatWaveSchedule::RETURNED_BUFFER_COUNT, 2);
+    assert_eq!(
+        3 * tarjan.len() + condensation.len() + waves.materialization_work,
+        6 * tarjan.len() + condensation.len() + 3 * waves.wave_count() + 1
+    );
     for left in 0..tarjan.len() {
         for right in 0..tarjan.len() {
             if levels[left] == levels[right] {
@@ -505,11 +602,23 @@ fn verify_graph(vertex_count: usize, edges: &[(usize, usize)], rename_cases: &mu
 
         let renamed_levels =
             topological_levels(renamed_components.len(), &actual_renamed_condensation);
+        let renamed_waves = FlatWaveSchedule::from_levels(&renamed_levels);
+        assert!(renamed_waves.is_valid_for(&renamed_levels));
         for old_component in 0..tarjan.len() {
             assert_eq!(
                 levels[old_component],
                 renamed_levels[component_renaming[old_component]]
             );
+        }
+        assert_eq!(waves.wave_count(), renamed_waves.wave_count());
+        for wave in 0..waves.wave_count() {
+            let mut expected_members: Vec<usize> = waves
+                .wave(wave)
+                .iter()
+                .map(|component| component_renaming[*component])
+                .collect();
+            expected_members.sort_unstable();
+            assert_eq!(expected_members, renamed_waves.wave(wave));
         }
         *rename_cases += 1;
     }
@@ -533,6 +642,15 @@ fn verify_deep_small_stack() {
                 metrics.total_work(),
                 5 * DEEP_CHAIN_VERTICES + (DEEP_CHAIN_VERTICES - 1)
             );
+            let levels: Vec<usize> = (0..DEEP_CHAIN_VERTICES).collect();
+            let waves = FlatWaveSchedule::from_levels(&levels);
+            assert!(waves.is_valid_for(&levels));
+            assert_eq!(waves.wave_count(), DEEP_CHAIN_VERTICES);
+            assert_eq!(FlatWaveSchedule::RETURNED_BUFFER_COUNT, 2);
+            assert_eq!(
+                waves.materialization_work,
+                3 * DEEP_CHAIN_VERTICES + 3 * DEEP_CHAIN_VERTICES + 1
+            );
             let condensation = condensation_edges(&graph, &components);
             assert_eq!(condensation.len(), DEEP_CHAIN_VERTICES - 1);
         })
@@ -555,6 +673,6 @@ fn main() {
     }
     verify_deep_small_stack();
     println!(
-        "verified {graph_cases} directed graphs, {rename_cases} renaming cases, exact linear Tarjan work, and a {DEEP_CHAIN_VERTICES}-vertex 256 KiB-stack chain"
+        "verified {graph_cases} directed graphs, {rename_cases} renaming cases, exact linear Tarjan work, flat-wave refinement, and a {DEEP_CHAIN_VERTICES}-vertex 256 KiB-stack chain"
     );
 }

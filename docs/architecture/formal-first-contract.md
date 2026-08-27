@@ -15,7 +15,7 @@ contract.
 |---|---|---|
 | Relational and resource semantics | `formal/rocq/GraphQuotient.v` | Fibers, quotient edges, acyclicity, renaming, enumeration, wavefront laws, exact logical work, linear heap space, and constant native control depth |
 | Lifecycle model | `formal/tla/IterativeGraphMachine.tla` | Explicit frames, bounded frame count, exact discovery/edge/frame accounting, linear work, completion, and cancellation |
-| Exhaustive oracle | `formal/model/exhaustive_graphs.rs` | Canonical forward/reverse CSR, every graph through four vertices, independent SCC oracle, all renamings, induced condensation/rank equivalence, adversarial enumerations, exact work counters, and a small-stack deep graph |
+| Exhaustive oracle | `formal/model/exhaustive_graphs.rs` | Canonical forward/reverse CSR, every graph through four vertices, independent SCC oracle, all renamings, induced condensation/rank/flat-wave equivalence, adversarial enumerations, exact work and returned-buffer counters, and a small-stack deep graph |
 | Production refinement | Rust tests and verifier harnesses | CSR validation, iterative Tarjan parity, stable ordering, malformed-input behavior, measured work/allocation bounds, recursion census, and small-stack lifecycle |
 
 The first three layers precede production implementation. The fourth is required before the
@@ -54,9 +54,9 @@ A future implementation is admitted only when all answers are “yes.”
 11. On canonical CSR, does SCC work equal $`5|V| + |E|`$ logical events and stay within
     $`5|V|`$ auxiliary vertex slots, excluding returned output?
 12. Does phase-complete charging include safe workspace initialization, flat fiber
-    materialization, paired condensation CSR construction, wave containers, and exact radix work,
-    with a bound at or below $`23|V| + 20|E| + 26{,}627`$?
-13. Does reusable temporary storage stay at or below $`10|V| + 2|E| + 2{,}048`$ slots,
+    materialization, paired condensation CSR construction, flat wave offsets and members, and
+    exact radix work, with a bound at or below $`27|V| + 20|E| + 26{,}628`$?
+13. Does reusable temporary storage stay at or below $`9|V| + 2|E| + 2{,}048`$ slots,
     excluding returned partition, condensation, and schedule values?
 14. Does a source and call-graph census establish zero recursive control edges on every public
     input-depth-sensitive path?

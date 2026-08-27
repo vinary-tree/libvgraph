@@ -94,35 +94,36 @@ The remaining phase charges are explicit:
 | SCC partition | $`10\lvert V\rvert + \lvert E\rvert + 3\lvert C\rvert + 1`$ | Workspace initialization, Tarjan trace, canonical map, flat sorted fibers |
 | Quotient source scan | $`\lvert E\rvert`$ | Cycle flags and cross-component candidates |
 | Condensation CSR | $`5\lvert C\rvert + 3\lvert Q\rvert + 2`$ | Paired forward/reverse offsets, prefixes, targets, reverse fill, offset restoration |
-| Wavefront schedule | $`4\lvert C\rvert + \lvert Q\rvert + \lvert W\rvert`$ | Indegrees, ranks, removals, quotient-edge scan, wave containers, assignments |
+| Wavefront schedule | $`6\lvert C\rvert + \lvert Q\rvert + 3\lvert W\rvert + 1`$ | Indegrees, ranks, removals, quotient-edge scan, flat offset counting and prefixing, member initialization and stable placement, offset restoration |
 
 Consequently, the phase-complete exact charge is:
 
 ```math
-10|V| + 2|E| + W_{\mathrm{radix}}(|R|) + 12|C| + 4|Q| + |W| + 3.
+10|V| + 2|E| + W_{\mathrm{radix}}(|R|) + 14|C| + 4|Q| + 3|W| + 4.
 ```
 
 Because $`|R| \le |E|`$, $`|C| \le |V|`$, $`|Q| \le |E|`$,
 $`|W| \le |C|`$, and $`13B = 26{,}624`$, the uniform upper bound is:
 
 ```math
-10|V| + 2|E| + W_{\mathrm{radix}}(|R|) + 12|C| + 4|Q| + |W| + 3
-\le 23|V| + 20|E| + 26{,}627.
+10|V| + 2|E| + W_{\mathrm{radix}}(|R|) + 14|C| + 4|Q| + 3|W| + 4
+\le 27|V| + 20|E| + 26{,}628.
 ```
 
-Reusable temporary storage retains five Tarjan vertex arrays or stacks, five component-sized
-arrays or queues, the candidate and radix scratch vectors, and the fixed bucket array. Returned
-partition, condensation, and schedule values are excluded. Its bound is:
+Reusable temporary storage retains five Tarjan vertex arrays or stacks, four component-sized
+arrays or queues, the candidate and radix scratch vectors, and the fixed bucket array. Flat wave
+offsets and members belong to the returned schedule, so they are not auxiliary workspace.
+Returned partition and condensation values are likewise excluded. The workspace bound is:
 
 ```math
-5|V| + 5|C| + 2|R| + B \le 10|V| + 2|E| + 2{,}048.
+5|V| + 4|C| + 2|R| + B \le 9|V| + 2|E| + 2{,}048.
 ```
 
 ![Linear work and heap bounds across the canonical pipeline](../diagrams/linear-work-bound.svg)
 
 These are charged logical loop and bulk-initialization bounds, not instruction counts or wall-clock
 predictions. The formulas expose workspace preparation, returned-representation construction,
-both fixed bucket scans, and wave-container creation instead of hiding them in asymptotic notation.
+both fixed bucket scans, and flat-wave construction instead of hiding them in asymptotic notation.
 Production acceptance also measures cache misses, allocations, peak resident memory, and
 throughput on relevant Vinary workloads. It reuses libcpg's established choice of iterative
 Tarjan rather than repeating an already-settled Tarjan-versus-Kosaraju comparison.
@@ -168,9 +169,37 @@ procedure CANONICAL-CONDENSATION(vertex_count, input_edges)
     quotient_edges := FIXED-WIDTH-RADIX-SORT-AND-DEDUPLICATE(quotient_candidates)
 
     ranks := deterministic linear longest-predecessor ranks over quotient_edges
-    return components, component_of, quotient_edges, ranks
+    wave_offsets, wave_members := FLATTEN-WAVES(ranks)
+    return components, component_of, quotient_edges, ranks, wave_offsets, wave_members
+end procedure
+
+procedure FLATTEN-WAVES(ranks)
+    wave_count := zero for no components, otherwise one plus the maximum rank
+    offsets := wave_count plus one zeroes
+    for each component in ascending order
+        increment offsets[ranks[component] + 1]
+    prefix-sum offsets from left to right
+
+    members := component_count uninitialized slots
+    for each component in descending order
+        decrement offsets[ranks[component] + 1]
+        members[offsets[ranks[component] + 1]] := component
+
+    shift the recovered wave starts one position left
+    set offsets[wave_count] to component_count
+    return offsets, members
 end procedure
 ```
+
+Descending placement makes each wave slice ascending without a comparison sort. The returned
+representation always has two vectors regardless of the number of waves, eliminating the
+$`O(|W|)`$ independent allocations required by a vector of vectors. Adjacent offsets delimit every
+wave, the terminal offset equals $`|C|`$, and the member vector is a permutation of the dense
+component domain. The returned representation has exactly $`|C| + |W| + 1`$ element slots across
+those two vectors. The Rocq refinement theorems connect those representation laws to wavefront
+independence and prove both output-resource identities; the exhaustive model constructs the arrays,
+accumulates work from the executed loops, and checks them for every bounded graph and vertex
+renaming.
 
 The formal model rejects a malformed CSR direction unless its offsets have the required shape,
 begin at zero, are monotone, end at the target count, and delimit strictly sorted unique in-range

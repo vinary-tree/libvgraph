@@ -22,11 +22,11 @@ amplification, duplicate-edge amplification, native-stack exhaustion, or false c
 - Use nonrecursive fixed-width canonicalization for dense quotient edges. Charge scratch and
   bucket initialization, both $`2{,}048`$-bucket scans in every one of the six full radix passes,
   both candidate scans per pass, and final deduplication. Also charge flat-fiber materialization,
-  paired condensation CSR construction, and wave-container creation; do not hide representation
-  work behind asymptotic notation. Do not call a recursive comparison sort from an
+  paired condensation CSR construction, and flat wave offset/member construction; do not hide
+  representation work behind asymptotic notation. Do not call a recursive comparison sort from an
   input-depth-sensitive public path.
-- Keep phase-complete charged work at or below $`23|V| + 20|E| + 26{,}627`$ and reusable
-  temporary storage at or below $`10|V| + 2|E| + 2{,}048`$ slots, excluding returned values.
+- Keep phase-complete charged work at or below $`27|V| + 20|E| + 26{,}628`$ and reusable
+  temporary storage at or below $`9|V| + 2|E| + 2{,}048`$ slots, excluding returned values.
 - Treat cancellation and cap exhaustion as incomplete outcomes. They cannot certify acyclicity,
   reachability absence, or exact completion.
 - Keep public ordering deterministic so attacker-controlled insertion order cannot perturb caches,

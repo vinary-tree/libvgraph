@@ -361,6 +361,99 @@ Proof.
   - specialize (Hincreases right left Hedge). lia.
 Qed.
 
+(** A flat wave representation stores every component identifier in one member
+    list and delimits wave [wave] with adjacent offsets [wave] and
+    [S wave]. This definition is independent of any concrete array type. *)
+Definition in_flat_wave
+    (offsets members : list nat) (wave component : nat) : Prop :=
+  exists start stop position,
+    nth_error offsets wave = Some start /\
+    nth_error offsets (S wave) = Some stop /\
+    start <= position < stop /\
+    nth_error members position = Some component.
+
+(** The representation is a total, duplicate-free refinement of a rank
+    function. Adjacent offsets are monotone, the terminal offset covers every
+    member, every dense component occurs exactly once, represented members have
+    exactly their enclosing wave's rank, and every dense component is covered. *)
+Record flat_wave_refinement
+    (component_count wave_count : nat) (rank : nat -> nat)
+    (offsets members : list nat) : Prop := {
+  flat_offsets_length : length offsets = S wave_count;
+  flat_offsets_origin : nth_error offsets 0 = Some 0;
+  flat_offsets_terminal :
+    nth_error offsets wave_count = Some component_count;
+  flat_offsets_monotone :
+    forall index start stop,
+      nth_error offsets index = Some start ->
+      nth_error offsets (S index) = Some stop ->
+      start <= stop;
+  flat_members_length : length members = component_count;
+  flat_members_permutation : Permutation members (seq 0 component_count);
+  flat_member_rank_exact :
+    forall wave component,
+      wave < wave_count ->
+      in_flat_wave offsets members wave component ->
+      rank component = wave;
+  flat_component_covered :
+    forall component,
+      component < component_count ->
+      exists wave,
+        wave < wave_count /\
+        in_flat_wave offsets members wave component
+}.
+
+Definition flat_wave_returned_buffer_count : nat := 2.
+
+Theorem flat_wave_returned_buffer_count_constant :
+  forall (component_count wave_count : nat),
+    flat_wave_returned_buffer_count = 2.
+Proof.
+  intros component_count wave_count.
+  reflexivity.
+Qed.
+
+Definition flat_wave_returned_slots (offsets members : list nat) : nat :=
+  length offsets + length members.
+
+Theorem flat_wave_returned_slots_exact :
+  forall component_count wave_count rank offsets members,
+    flat_wave_refinement component_count wave_count rank offsets members ->
+    flat_wave_returned_slots offsets members =
+      component_count + wave_count + 1.
+Proof.
+  intros component_count wave_count rank offsets members Hflat.
+  destruct Hflat.
+  unfold flat_wave_returned_slots.
+  lia.
+Qed.
+
+Theorem flat_wave_same_wave_has_no_dependency :
+  forall (V : Type) (edge : V -> V -> Prop) (quotient : V -> nat)
+    component_count wave_count rank offsets members,
+    flat_wave_refinement component_count wave_count rank offsets members ->
+    (forall source target,
+      quotient_edge edge quotient source target -> rank source < rank target) ->
+    forall wave left right,
+      wave < wave_count ->
+      in_flat_wave offsets members wave left ->
+      in_flat_wave offsets members wave right ->
+      ~ quotient_edge edge quotient left right /\
+      ~ quotient_edge edge quotient right left.
+Proof.
+  intros V edge quotient component_count wave_count rank offsets members
+    Hflat Hincreases wave left right Hwave Hleft Hright.
+  apply (@same_wavefront_has_no_dependency
+    V nat edge quotient rank Hincreases left right).
+  rewrite (@flat_member_rank_exact
+    component_count wave_count rank offsets members Hflat
+    wave left Hwave Hleft).
+  rewrite (@flat_member_rank_exact
+    component_count wave_count rank offsets members Hflat
+    wave right Hwave Hright).
+  reflexivity.
+Qed.
+
 (** Logical work performed by one complete explicit-frame Tarjan traversal.
 
     [root_checks] counts the dense outer-loop positions, [discoveries] counts
@@ -548,11 +641,13 @@ Definition condensation_csr_work
   5 * component_count + 3 * quotient_edge_count + 2.
 
 (** Scheduling initializes indegrees and ranks, removes every component once,
-    scans every quotient edge once, initializes every nonempty wave, and assigns
-    every component to one wave. *)
+    scans every quotient edge once, and materializes the waves as one flat
+    member array plus [wave_count + 1] offsets. Stable counting placement scans
+    all components three times, initializes the member array once, and performs
+    three wave-count-sized offset passes plus the terminal offset. *)
 Definition wavefront_work
     (component_count quotient_edge_count wave_count : nat) : nat :=
-  4 * component_count + quotient_edge_count + wave_count.
+  6 * component_count + quotient_edge_count + 3 * wave_count + 1.
 
 (** The phase-complete pipeline comprises partition materialization, one source
     edge scan for cycle flags and quotient candidates, radix canonicalization,
@@ -582,8 +677,8 @@ Theorem quotient_wavefront_work_linear :
       quotient_edge_count wave_count ->
     quotient_wavefront_work vertex_count edge_count candidate_count component_count
       quotient_edge_count wave_count <=
-        23 * vertex_count + 20 * edge_count +
-        13 * quotient_radix_bucket_count + 3.
+        27 * vertex_count + 20 * edge_count +
+        13 * quotient_radix_bucket_count + 4.
 Proof.
   intros vertex_count edge_count candidate_count component_count
     quotient_edge_count wave_count Hdimensions.
@@ -596,11 +691,12 @@ Qed.
 
 (** Excluding returned partition, condensation, and schedule values, the
     reusable pipeline workspace retains the five Tarjan vertex arrays/stacks,
-    five component-sized temporary arrays/queues, candidate and radix scratch
-    vectors, and one fixed radix bucket array. *)
+    four component-sized temporary arrays/queues, candidate and radix scratch
+    vectors, and one fixed radix bucket array. Flat wave offsets and members are
+    returned schedule storage rather than auxiliary workspace. *)
 Definition pipeline_auxiliary_slots
     (vertex_count candidate_count component_count : nat) : nat :=
-  5 * vertex_count + 5 * component_count +
+  5 * vertex_count + 4 * component_count +
   2 * candidate_count + quotient_radix_bucket_count.
 
 Theorem pipeline_auxiliary_slots_linear :
@@ -609,7 +705,7 @@ Theorem pipeline_auxiliary_slots_linear :
     quotient_dimensions vertex_count edge_count candidate_count component_count
       quotient_edge_count wave_count ->
     pipeline_auxiliary_slots vertex_count candidate_count component_count <=
-      10 * vertex_count + 2 * edge_count + quotient_radix_bucket_count.
+      9 * vertex_count + 2 * edge_count + quotient_radix_bucket_count.
 Proof.
   intros vertex_count edge_count candidate_count component_count
     quotient_edge_count wave_count Hdimensions.
@@ -633,6 +729,9 @@ Print Assumptions edge_enumeration_permutation_invariant.
 Print Assumptions edge_enumeration_duplicate_invariant.
 Print Assumptions quotient_edge_extensional_invariant.
 Print Assumptions same_wavefront_has_no_dependency.
+Print Assumptions flat_wave_same_wave_has_no_dependency.
+Print Assumptions flat_wave_returned_buffer_count_constant.
+Print Assumptions flat_wave_returned_slots_exact.
 Print Assumptions complete_tarjan_work_exact.
 Print Assumptions complete_tarjan_work_linear.
 Print Assumptions tarjan_auxiliary_heap_linear.
