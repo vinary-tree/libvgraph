@@ -8,3 +8,9 @@ mkdir -p "$evidence_directory"
 "$repository_root/scripts/render-diagrams.sh"
 vinary-doc-lint check "$repository_root" --diagram-tools --format json 2>&1 \
   | tee "$evidence_directory/vinary-doc-lint.json"
+jq -e '
+  all(.files[];
+    ((.diagnostics // []) | length) == 0 and
+    ((.changes // []) | length) == 0
+  )
+' "$evidence_directory/vinary-doc-lint.json" >/dev/null

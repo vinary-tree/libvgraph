@@ -13,10 +13,10 @@ contract.
 
 | Layer | Artifact | Obligation |
 |---|---|---|
-| Relational semantics | `formal/rocq/GraphQuotient.v` | Fibers, quotient edges, acyclicity, renaming, enumeration, and wavefront laws |
-| Lifecycle model | `formal/tla/IterativeGraphMachine.tla` | Explicit frames, bounded frame count, total state domains, completion, and cancellation |
-| Exhaustive oracle | `formal/model/exhaustive_graphs.rs` | Canonical forward/reverse CSR, every graph through four vertices, independent SCC oracle, all renamings, induced condensation/rank equivalence, and adversarial enumerations |
-| Production refinement | Future Rust tests and proofs | CSR validation, iterative Tarjan parity, stable ordering, malformed-input behavior, and small-stack lifecycle |
+| Relational and resource semantics | `formal/rocq/GraphQuotient.v` | Fibers, quotient edges, acyclicity, renaming, enumeration, wavefront laws, exact logical work, linear heap space, and constant native control depth |
+| Lifecycle model | `formal/tla/IterativeGraphMachine.tla` | Explicit frames, bounded frame count, exact discovery/edge/frame accounting, linear work, completion, and cancellation |
+| Exhaustive oracle | `formal/model/exhaustive_graphs.rs` | Canonical forward/reverse CSR, every graph through four vertices, independent SCC oracle, all renamings, induced condensation/rank equivalence, adversarial enumerations, exact work counters, and a small-stack deep graph |
+| Production refinement | Rust tests and verifier harnesses | CSR validation, iterative Tarjan parity, stable ordering, malformed-input behavior, measured work/allocation bounds, recursion census, and small-stack lifecycle |
 
 The first three layers precede production implementation. The fourth is required before the
 implementation task can be verified.
@@ -28,7 +28,7 @@ The formal work reserves behaviors rather than premature Rust signatures:
 - canonical construction from stable vertices and directed edges;
 - non-panicking validation of public or deserialized CSR;
 - deterministic forward and reverse adjacency;
-- iterative SCC decomposition and explicit component lookup;
+- strict-linear iterative SCC decomposition and explicit component lookup;
 - exact condensation construction and deterministic topological wavefronts; and
 - structured incomplete or invalid outcomes when a resource or representation bound is exceeded.
 
@@ -51,3 +51,14 @@ A future implementation is admitted only when all answers are “yes.”
 8. Are caps, cancellation, malformed input, and overflow explicit rather than reported as success?
 9. Do serial and future parallel paths produce the same canonical output?
 10. Do Rocq, TLC, the exhaustive oracle, Rust tests, strict lint, and documentation lint all pass?
+11. On canonical CSR, does SCC work equal $`5|V| + |E|`$ logical events and stay within
+    $`5|V|`$ auxiliary vertex slots, excluding returned output?
+12. Do quotient construction and wavefront scheduling keep the complete bound at or below
+    $`8|V| + 3|E|`$, using $`|C| \le |V|`$ and $`|Q| \le |E|`$?
+13. Does a source and call-graph census establish zero recursive control edges on every public
+    input-depth-sensitive path?
+
+The symbols $`V`$ and $`E`$ denote source vertices and canonical source edges. The symbols $`C`$
+and $`Q`$ denote SCC components and distinct condensation edges. Returned graph and partition
+storage is output, whereas temporary arrays, queues, stacks, and sorting buffers are auxiliary
+storage.

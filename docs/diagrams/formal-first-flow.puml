@@ -11,13 +11,14 @@ skinparam activity {
   DiamondBorderColor #B45309
 }
 
-title Formal-first graph-kernel delivery
+title Formal-first libvgraph delivery
 
 start
 :Define terms and observable semantics; <<#DBEAFE>>
 :Prove quotient and wavefront laws in Rocq; <<#C4B5FD>>
-:Model explicit-frame lifecycle in TLA+; <<#A7F3D0>>
-:Run exhaustive independent graph oracle; <<#FDE68A>>
+:Prove work, heap, and native-control bounds; <<#DDD6FE>>
+:Model explicit-frame lifecycle and work in TLA+; <<#A7F3D0>>
+:Run exhaustive independent graph and cost oracle; <<#FDE68A>>
 if (All pre-implementation gates pass?) then (yes)
   :Implement canonical CSR and iterative SCC kernel; <<#BFDBFE>>
   :Check implementation refinement and small-stack behavior; <<#A7F3D0>>

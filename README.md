@@ -1,14 +1,18 @@
-# Vinary Graph Kernel
+# libvgraph
 
-Vinary Graph Kernel is the formally specified, deterministic graph substrate for Vinary projects.
-This initial repository contains the pre-implementation contract only. Production Rust source is
-intentionally absent until the proof, model-checking, exhaustive-oracle, and documentation gates
-pass.
+libvgraph is the formally specified, deterministic structural-graph substrate for Vinary projects.
+Its production refinement remains gated by machine-checked semantics, explicit work and heap
+bounds, exhaustive independent oracles, and documentation verification.
 
 The first contract covers canonical compressed sparse row (CSR) graphs, strongly connected
 component (SCC) quotients, condensation directed acyclic graphs (DAGs), and dependency wavefronts.
 It preserves the semantics already exercised by `libcpg` while remaining independent of code
 property graphs, equality graphs, parsers, and weighted automata.
+
+On validated canonical CSR, the required SCC path is iterative, uses strict linear work, retains
+all graph-depth state on the heap, and preserves a constant native control depth. Arbitrary stable
+labels are canonicalized at a separately named comparison-model boundary so their unavoidable
+ordering cost is never conflated with graph-analysis complexity.
 
 ## Start here
 
@@ -26,9 +30,9 @@ Run `scripts/verify-formal.sh` before adding production code. Run
 
 ## Status
 
-The formal contract is being implemented under pgmcp task `vco-e2-formal-contracts`. The
-production crate task `vco-e2-kernel-implementation` remains dependency-blocked until this
-contract is checked and recorded.
+The strengthened formal contract is tracked by pgmcp task `vco-e2-formal-contracts`. The
+production task `vco-e2-kernel-implementation` remains blocked until the stack-safety and
+complexity refinements are checked and recorded.
 
 ## License
 

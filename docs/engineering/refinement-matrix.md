@@ -18,6 +18,10 @@ tests alone is insufficient unless those tests exercise the mapped obligation be
 | Renaming equivariance | Property tests compare the induced component bijection, quotient edges, and ranks |
 | Enumeration invariance | Input edge permutations and duplicates produce identical canonical bytes |
 | Stack safety | Deep/wide construction, SCC, quotient, formatting, serialization, clone, and drop on a 256 KiB thread |
+| Strict-linear SCC work | Instrumented production counters equal $`5\lvert V\rvert + \lvert E\rvert`$ on canonical CSR and scale proportionally on deep, wide, sparse, dense, and adversarial graphs |
+| Linear SCC auxiliary space | Allocation/peak-state evidence stays within the declared $`5\lvert V\rvert`$ vertex-slot model, excluding returned output |
+| Constant native control depth | Source and call-graph census finds no recursive edge on input-depth-sensitive paths; small-stack tests cover all public lifecycle operations |
+| Linear quotient and waves | Counted work is at most $`8\lvert V\rvert + 3\lvert E\rvert`$ for SCC, exact quotient construction, and wavefront ranking |
 | Cancellation and limits | Exhaustion returns a structured incomplete result and never certifies exact completion |
 
 ## Malformed-representation matrix
@@ -33,6 +37,15 @@ Parallel traversal is not admitted merely because individual graph operations ar
 The serial implementation defines the reference observation. A parallel implementation must use
 stable task identities, dependency-valid wavefronts, isolated task state, and ordered commit, then
 produce the same canonical result under varied worker counts and randomized completion schedules.
+
+## Algorithm-selection discipline
+
+The canonical dense path uses algorithms whose bounds match the information that must be read or
+returned: CSR validation and traversal are linear, Tarjan SCC is linear, fixed-width quotient
+canonicalization is linear in the word-RAM model, and rank/wave construction is linear in the
+condensation size. Arbitrary `Ord` stable labels use a separately exposed comparison-model path;
+its ordering lower bound is not charged to dense graph analysis. Existing libcpg algorithm-choice
+evidence is reused. Only new or materially refactored paths receive new performance experiments.
 
 ## Evidence handling
 

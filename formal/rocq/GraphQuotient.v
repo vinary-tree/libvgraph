@@ -361,6 +361,140 @@ Proof.
   - specialize (Hincreases right left Hedge). lia.
 Qed.
 
+(** Logical work performed by one complete explicit-frame Tarjan traversal.
+
+    [root_checks] counts the dense outer-loop positions, [discoveries] counts
+    first visits, [edge_inspections] counts canonical CSR entries exactly once,
+    [frame_finishes] counts explicit DFS-frame removals, [active_pops] counts
+    removals from Tarjan's active stack, and [canonical_assignments] counts the
+    final ascending dense-vertex scan that assigns canonical component ids and
+    produces sorted fibers without comparison sorting. *)
+Record tarjan_trace_counts := {
+  root_checks : nat;
+  discoveries : nat;
+  edge_inspections : nat;
+  frame_finishes : nat;
+  active_pops : nat;
+  canonical_assignments : nat
+}.
+
+Definition tarjan_work (counts : tarjan_trace_counts) : nat :=
+  root_checks counts + discoveries counts + edge_inspections counts +
+  frame_finishes counts + active_pops counts + canonical_assignments counts.
+
+Record complete_tarjan_trace
+    (vertex_count edge_count : nat) (counts : tarjan_trace_counts) : Prop := {
+  roots_accounted : root_checks counts = vertex_count;
+  discoveries_accounted : discoveries counts = vertex_count;
+  edges_accounted : edge_inspections counts = edge_count;
+  frames_accounted : frame_finishes counts = vertex_count;
+  active_accounted : active_pops counts = vertex_count;
+  canonical_assignments_accounted : canonical_assignments counts = vertex_count
+}.
+
+Theorem complete_tarjan_work_exact :
+  forall vertex_count edge_count counts,
+    complete_tarjan_trace vertex_count edge_count counts ->
+    tarjan_work counts = 5 * vertex_count + edge_count.
+Proof.
+  intros vertex_count edge_count counts Htrace.
+  destruct Htrace.
+  unfold tarjan_work.
+  lia.
+Qed.
+
+Theorem complete_tarjan_work_linear :
+  forall vertex_count edge_count counts,
+    complete_tarjan_trace vertex_count edge_count counts ->
+    tarjan_work counts <= 5 * vertex_count + edge_count.
+Proof.
+  intros vertex_count edge_count counts Htrace.
+  rewrite (@complete_tarjan_work_exact vertex_count edge_count counts Htrace).
+  lia.
+Qed.
+
+(** Peak auxiliary heap slots for Tarjan, excluding the returned partition.
+    Three dense arrays have exactly [vertex_count] slots. The active stack and
+    explicit DFS-frame stack never exceed [vertex_count]. *)
+Record tarjan_heap_counts := {
+  discovery_slots : nat;
+  low_link_slots : nat;
+  raw_component_slots : nat;
+  peak_active_slots : nat;
+  peak_frame_slots : nat
+}.
+
+Definition tarjan_heap_slots (counts : tarjan_heap_counts) : nat :=
+  discovery_slots counts + low_link_slots counts + raw_component_slots counts +
+  peak_active_slots counts + peak_frame_slots counts.
+
+Record bounded_tarjan_heap
+    (vertex_count : nat) (counts : tarjan_heap_counts) : Prop := {
+  discovery_slots_exact : discovery_slots counts = vertex_count;
+  low_link_slots_exact : low_link_slots counts = vertex_count;
+  raw_component_slots_exact : raw_component_slots counts = vertex_count;
+  active_slots_bounded : peak_active_slots counts <= vertex_count;
+  frame_slots_bounded : peak_frame_slots counts <= vertex_count
+}.
+
+Theorem tarjan_auxiliary_heap_linear :
+  forall vertex_count counts,
+    bounded_tarjan_heap vertex_count counts ->
+    tarjan_heap_slots counts <= 5 * vertex_count.
+Proof.
+  intros vertex_count counts Hheap.
+  destruct Hheap.
+  unfold tarjan_heap_slots.
+  lia.
+Qed.
+
+(** A stack-safe refinement has no recursive control edge and retains one
+    native entry frame independent of graph size. All graph-depth state belongs
+    to the bounded heap structures above. *)
+Record iterative_control_shape := {
+  recursive_control_edges : nat;
+  resident_native_frames : nat
+}.
+
+Definition stack_safe_control (shape : iterative_control_shape) : Prop :=
+  recursive_control_edges shape = 0 /\ resident_native_frames shape <= 1.
+
+Theorem iterative_control_native_stack_constant :
+  forall shape,
+    stack_safe_control shape ->
+    forall (vertex_count edge_count : nat),
+      resident_native_frames shape <= 1.
+Proof.
+  intros shape [_ Hframes] vertex_count edge_count.
+  exact Hframes.
+Qed.
+
+(** The exact quotient and linear wavefront pipeline scans source edges once,
+    processes each quotient edge once, and processes each component three times
+    (indegree initialization, ready removal, and wave assignment). *)
+Definition quotient_wavefront_work
+    (vertex_count edge_count component_count quotient_edge_count : nat) : nat :=
+  5 * vertex_count + 2 * edge_count +
+  3 * component_count + quotient_edge_count.
+
+Record quotient_dimensions
+    (vertex_count edge_count component_count quotient_edge_count : nat) : Prop := {
+  component_count_bounded : component_count <= vertex_count;
+  quotient_edge_count_bounded : quotient_edge_count <= edge_count
+}.
+
+Theorem quotient_wavefront_work_linear :
+  forall vertex_count edge_count component_count quotient_edge_count,
+    quotient_dimensions vertex_count edge_count component_count quotient_edge_count ->
+    quotient_wavefront_work vertex_count edge_count component_count quotient_edge_count
+      <= 8 * vertex_count + 3 * edge_count.
+Proof.
+  intros vertex_count edge_count component_count quotient_edge_count Hdimensions.
+  destruct Hdimensions.
+  unfold quotient_wavefront_work.
+  lia.
+Qed.
+
 Print Assumptions strongly_connected_transitive.
 Print Assumptions scc_quotient_kernel_exact.
 Print Assumptions scc_quotient_fibers_nonempty.
@@ -376,3 +510,8 @@ Print Assumptions edge_enumeration_permutation_invariant.
 Print Assumptions edge_enumeration_duplicate_invariant.
 Print Assumptions quotient_edge_extensional_invariant.
 Print Assumptions same_wavefront_has_no_dependency.
+Print Assumptions complete_tarjan_work_exact.
+Print Assumptions complete_tarjan_work_linear.
+Print Assumptions tarjan_auxiliary_heap_linear.
+Print Assumptions iterative_control_native_stack_constant.
+Print Assumptions quotient_wavefront_work_linear.

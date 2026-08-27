@@ -26,6 +26,8 @@ graphs. For each graph, it also checks every permutation of the vertex domain. T
 | Edge enumeration | Canonical CSR builder | Reversed enumeration with every edge duplicated |
 | Quotient edges | Cross-component scan | Induced edge-set renaming under every vertex permutation |
 | Wavefront rank | Deterministic topological pass | Rank equality after induced component renaming |
+| Logical work | Instrumented Tarjan lifecycle | Exact $`5\lvert V\rvert + \lvert E\rvert`$ event identity on every enumerated and renamed graph |
+| Heap depth state | Active/frame peak counters | Each peak is at most $`\lvert V\rvert`$ |
 | Native stack use | Explicit heap frames | 20,000-vertex chain on a 256 KiB thread stack |
 
 The CSR check validates both directions independently and then compares their extensional edge
@@ -37,7 +39,8 @@ well-shaped but mutually inconsistent.
 Self-loops, empty graphs, complete graphs, disconnected vertices, one large SCC, many singleton
 SCCs, duplicate enumerations, reverse enumerations, and every stable-ID permutation occur within
 the exhaustive domain. The deep chain separately stresses input-depth independence from native
-stack depth.
+stack depth. The measured model canonicalizes fibers with an ascending dense-vertex scan rather
+than comparison sorting, so the SCC subject itself retains strict linear work.
 
 ## Interpretation and limits
 
@@ -46,4 +49,5 @@ unbounded graph size. The Rocq development establishes the size-independent rela
 the TLA+ model establishes the bounded-state lifecycle invariants. Production acceptance must
 add refinement evidence connecting the Rust crate to all three pre-implementation layers,
 including malformed serialized CSR and resource-limit behavior that the valid-input exhaustive
-enumeration does not model.
+enumeration does not model. The model does not repeat Tarjan-versus-Kosaraju performance work;
+libcpg's established algorithm selection is an input to this campaign.

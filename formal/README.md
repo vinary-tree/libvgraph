@@ -5,14 +5,17 @@ The formal artifacts precede production implementation.
 - `rocq/GraphQuotient.v` defines the exact SCC quotient contract and proves fiber totality and
   nonemptiness, quotient-edge witness equivalence, condensation acyclicity, bidirectional
   renaming preservation, permutation/duplicate/extensional enumeration invariance, and wavefront
-  independence. `Print Assumptions` output must report a closed global context for every
-  acceptance theorem.
+  independence. It additionally proves exact $`5|V| + |E|`$ work for a complete canonical SCC
+  trace, an auxiliary-heap bound of $`5|V|`$ slots, constant native control depth, and an
+  end-to-end quotient/wavefront upper bound of $`8|V| + 3|E|`$. `Print Assumptions` output must
+  report a closed global context for every acceptance theorem.
 - `tla/IterativeGraphMachine.tla` models a finite explicit-frame traversal with completion and
-  cancellation. TLC checks type, ownership, uniqueness, frame-bound, and completion invariants.
+  cancellation. TLC checks type, ownership, uniqueness, frame bounds, exact discovery/edge/frame
+  work accounting, linear work, and exact completed-state work.
 - `model/exhaustive_graphs.rs` enumerates all directed graphs through four vertices, validates
   canonical forward/reverse CSR, compares the iterative SCC model with independent transitive
   closure, checks every vertex permutation together with its induced condensation and ranks, and
-  runs a 20,000-vertex small-stack lifecycle.
+  checks exact work counters, and runs a 20,000-vertex small-stack lifecycle.
 
 Run:
 

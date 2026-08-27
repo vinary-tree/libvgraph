@@ -11,6 +11,29 @@ struct DfsFrame {
     next_successor: usize,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct TarjanMetrics {
+    root_checks: usize,
+    discoveries: usize,
+    edge_inspections: usize,
+    frame_finishes: usize,
+    active_pops: usize,
+    canonical_assignments: usize,
+    peak_active: usize,
+    peak_frames: usize,
+}
+
+impl TarjanMetrics {
+    fn total_work(self) -> usize {
+        self.root_checks
+            + self.discoveries
+            + self.edge_inspections
+            + self.frame_finishes
+            + self.active_pops
+            + self.canonical_assignments
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct CanonicalCsr {
     vertex_count: usize,
@@ -131,7 +154,7 @@ fn canonical_graph(vertex_count: usize, edges: &[(usize, usize)]) -> Vec<Vec<usi
     adjacency
 }
 
-fn iterative_tarjan(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
+fn iterative_tarjan_with_metrics(adjacency: &[Vec<usize>]) -> (Vec<Vec<usize>>, TarjanMetrics) {
     const UNVISITED: usize = usize::MAX;
     const ASSIGNED: usize = usize::MAX - 1;
 
@@ -141,25 +164,32 @@ fn iterative_tarjan(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
     let mut next_index = 0usize;
     let mut active = Vec::with_capacity(vertex_count);
     let mut frames = Vec::with_capacity(vertex_count);
-    let mut components = Vec::new();
+    let mut raw_component_of = vec![UNVISITED; vertex_count];
+    let mut raw_component_count = 0usize;
+    let mut metrics = TarjanMetrics::default();
 
     for start in 0..vertex_count {
+        metrics.root_checks += 1;
         if discovery[start] != UNVISITED {
             continue;
         }
         discovery[start] = next_index;
         low_link[start] = next_index;
         next_index += 1;
+        metrics.discoveries += 1;
         active.push(start);
         frames.push(DfsFrame {
             node: start,
             next_successor: 0,
         });
+        metrics.peak_active = metrics.peak_active.max(active.len());
+        metrics.peak_frames = metrics.peak_frames.max(frames.len());
 
         while let Some(frame) = frames.last().copied() {
             let node = frame.node;
             if frame.next_successor < adjacency[node].len() {
                 let successor = adjacency[node][frame.next_successor];
+                metrics.edge_inspections += 1;
                 frames
                     .last_mut()
                     .expect("the current DFS frame must exist")
@@ -169,11 +199,14 @@ fn iterative_tarjan(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
                         discovery[successor] = next_index;
                         low_link[successor] = next_index;
                         next_index += 1;
+                        metrics.discoveries += 1;
                         active.push(successor);
                         frames.push(DfsFrame {
                             node: successor,
                             next_successor: 0,
                         });
+                        metrics.peak_active = metrics.peak_active.max(active.len());
+                        metrics.peak_frames = metrics.peak_frames.max(frames.len());
                     }
                     ASSIGNED => {}
                     successor_index => {
@@ -184,20 +217,20 @@ fn iterative_tarjan(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
             }
 
             frames.pop();
+            metrics.frame_finishes += 1;
             if low_link[node] == discovery[node] {
-                let mut component = Vec::new();
                 loop {
                     let member = active
                         .pop()
                         .expect("an SCC root must remain on the active stack");
+                    metrics.active_pops += 1;
                     discovery[member] = ASSIGNED;
-                    component.push(member);
+                    raw_component_of[member] = raw_component_count;
                     if member == node {
                         break;
                     }
                 }
-                component.sort_unstable();
-                components.push(component);
+                raw_component_count += 1;
             }
             if let Some(parent) = frames.last() {
                 low_link[parent.node] = low_link[parent.node].min(low_link[node]);
@@ -206,8 +239,43 @@ fn iterative_tarjan(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
     }
 
     assert!(active.is_empty());
-    components.sort_unstable();
-    components
+    assert!(raw_component_of
+        .iter()
+        .all(|component| *component != UNVISITED));
+
+    // Assign canonical component ids during one ascending dense-vertex scan.
+    // This orders fibers by their least member and members within every fiber
+    // without comparison sorting, preserving strict linear work.
+    let mut canonical_of_raw = vec![UNVISITED; raw_component_count];
+    let mut components: Vec<Vec<usize>> = Vec::with_capacity(raw_component_count);
+    for (vertex, &raw_component) in raw_component_of.iter().enumerate() {
+        metrics.canonical_assignments += 1;
+        let canonical = if canonical_of_raw[raw_component] == UNVISITED {
+            let canonical = components.len();
+            canonical_of_raw[raw_component] = canonical;
+            components.push(Vec::new());
+            canonical
+        } else {
+            canonical_of_raw[raw_component]
+        };
+        components[canonical].push(vertex);
+    }
+
+    let edge_count: usize = adjacency.iter().map(Vec::len).sum();
+    assert_eq!(metrics.root_checks, vertex_count);
+    assert_eq!(metrics.discoveries, vertex_count);
+    assert_eq!(metrics.edge_inspections, edge_count);
+    assert_eq!(metrics.frame_finishes, vertex_count);
+    assert_eq!(metrics.active_pops, vertex_count);
+    assert_eq!(metrics.canonical_assignments, vertex_count);
+    assert!(metrics.peak_active <= vertex_count);
+    assert!(metrics.peak_frames <= vertex_count);
+    assert_eq!(metrics.total_work(), 5 * vertex_count + edge_count);
+    (components, metrics)
+}
+
+fn iterative_tarjan(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
+    iterative_tarjan_with_metrics(adjacency).0
 }
 
 fn closure_oracle(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
@@ -375,7 +443,11 @@ fn verify_graph(vertex_count: usize, edges: &[(usize, usize)], rename_cases: &mu
     adversarial.extend(edges.iter().rev().copied());
     assert_eq!(csr, CanonicalCsr::from_edges(vertex_count, &adversarial));
 
-    let tarjan = iterative_tarjan(&adjacency);
+    let (tarjan, metrics) = iterative_tarjan_with_metrics(&adjacency);
+    assert_eq!(
+        metrics.total_work(),
+        5 * vertex_count + csr.forward_targets.len()
+    );
     let oracle = closure_oracle(&adjacency);
     assert_eq!(tarjan, oracle);
 
@@ -445,7 +517,7 @@ fn verify_graph(vertex_count: usize, edges: &[(usize, usize)], rename_cases: &mu
 
 fn verify_deep_small_stack() {
     let worker = thread::Builder::new()
-        .name("vinary-graph-kernel-formal-model".into())
+        .name("libvgraph-formal-model".into())
         .stack_size(SMALL_STACK_BYTES)
         .spawn(|| {
             let mut edges = Vec::with_capacity(DEEP_CHAIN_VERTICES.saturating_sub(1));
@@ -453,8 +525,14 @@ fn verify_deep_small_stack() {
                 edges.push((vertex, vertex + 1));
             }
             let graph = canonical_graph(DEEP_CHAIN_VERTICES, &edges);
-            let components = iterative_tarjan(&graph);
+            let (components, metrics) = iterative_tarjan_with_metrics(&graph);
             assert_eq!(components.len(), DEEP_CHAIN_VERTICES);
+            assert_eq!(metrics.peak_frames, DEEP_CHAIN_VERTICES);
+            assert!(metrics.peak_active <= DEEP_CHAIN_VERTICES);
+            assert_eq!(
+                metrics.total_work(),
+                5 * DEEP_CHAIN_VERTICES + (DEEP_CHAIN_VERTICES - 1)
+            );
             let condensation = condensation_edges(&graph, &components);
             assert_eq!(condensation.len(), DEEP_CHAIN_VERTICES - 1);
         })
@@ -477,6 +555,6 @@ fn main() {
     }
     verify_deep_small_stack();
     println!(
-        "verified {graph_cases} directed graphs, {rename_cases} renaming cases, and a {DEEP_CHAIN_VERTICES}-vertex 256 KiB-stack chain"
+        "verified {graph_cases} directed graphs, {rename_cases} renaming cases, exact linear Tarjan work, and a {DEEP_CHAIN_VERTICES}-vertex 256 KiB-stack chain"
     );
 }

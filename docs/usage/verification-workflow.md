@@ -13,8 +13,9 @@ From the repository root, run:
 scripts/verify-formal.sh all
 ```
 
-The command must finish with closed-context messages from Rocq, a no-error TLC completion, and the
-exact exhaustive-oracle summary. A nonzero exit or missing success marker fails the gate.
+The command must finish with 20 closed-context messages from Rocq, a no-error TLC completion, and
+the exact exhaustive-oracle summary including exact linear Tarjan work and the 256-KiB stack gate.
+A nonzero exit or missing success marker fails the gate.
 
 Individual layers are available for proof development:
 

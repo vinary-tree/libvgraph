@@ -16,13 +16,19 @@ amplification, duplicate-edge amplification, native-stack exhaustion, or false c
   budgets.
 - Keep input-depth traversal state in heap-owned vectors or queues; never map graph depth to native
   recursion depth.
+- Keep canonical-CSR SCC work at exactly $`5|V| + |E|`$ logical events and its auxiliary
+  vertex-slot peak at or below $`5|V|`$; reject an implementation whose hidden canonicalization
+  changes that bound.
+- Use nonrecursive fixed-width canonicalization for dense quotient edges. Do not call a recursive
+  comparison sort from an input-depth-sensitive public path.
 - Treat cancellation and cap exhaustion as incomplete outcomes. They cannot certify acyclicity,
   reachability absence, or exact completion.
 - Keep public ordering deterministic so attacker-controlled insertion order cannot perturb caches,
   reports, or evidence identities.
 - Avoid hidden global interning or unbounded retained state.
 
-The TLA+ lifecycle model establishes an explicit-frame bound for finite vertex sets. The exhaustive
-model exercises every graph with at most four vertices and a 20,000-vertex chain on a 256 KiB
-thread. Production acceptance raises lifecycle stress where feasible and adds malformed CSR,
-fuzzing, Kani, and sanitizer evidence.
+The Rocq cost model proves parameterized linear work and heap bounds. The TLA+ lifecycle model
+establishes exact discovery/edge/frame accounting and an explicit-frame bound for finite vertex
+sets. The exhaustive model exercises every graph with at most four vertices and a 20,000-vertex
+chain on a 256 KiB thread. Production acceptance raises lifecycle stress where feasible and adds
+malformed CSR, fuzzing, Kani, Verus, and sanitizer evidence.

@@ -45,7 +45,39 @@ bidirectional edge preservation under invertible renaming data, extensional and 
 enumeration invariance, and wavefront independence. The exhaustive executable model constructs
 the quotient and checks every directed graph with at most four vertices against an independent
 transitive-closure oracle and all vertex renamings. The TLA+ model checks the explicit heap-frame
-lifecycle and its frame bound.
+lifecycle, its frame bound, and exact operational work accounting.
+
+## Complexity and native-stack contract
+
+Let $`|V|`$ be the canonical vertex count, $`|E|`$ the canonical edge count, $`|C|`$ the SCC
+count, and $`|Q|`$ the distinct condensation-edge count. A complete explicit-frame Tarjan trace
+performs exactly:
+
+```math
+|V|_{\mathrm{roots}} + |V|_{\mathrm{discoveries}} + |E|_{\mathrm{edges}} +
+|V|_{\mathrm{finishes}} + |V|_{\mathrm{active\ pops}} +
+|V|_{\mathrm{canonical\ assignments}} = 5|V| + |E|.
+```
+
+The discovery, low-link, and raw-component arrays each contain $`|V|`$ slots. The active stack
+and explicit frame stack each peak at no more than $`|V|`$ entries. Excluding returned output,
+the SCC auxiliary bound is therefore $`5|V|`$ vertex-sized slots. The implementation has no
+recursive control edge; graph depth changes heap-vector lengths, not native call depth.
+
+Exact quotient construction scans source edges once. Linear wavefront construction initializes,
+removes, and assigns each component once and scans each quotient edge once. Because
+$`|C| \le |V|`$ and $`|Q| \le |E|`$, the composed work satisfies:
+
+```math
+5|V| + 2|E| + 3|C| + |Q| \le 8|V| + 3|E|.
+```
+
+![Linear work and heap bounds across the canonical pipeline](../diagrams/linear-work-bound.svg)
+
+These are logical-operation bounds, not wall-clock predictions. Production acceptance also
+measures cache misses, allocations, peak resident memory, and throughput on relevant Vinary
+workloads. It reuses libcpg's established choice of iterative Tarjan rather than repeating an
+already-settled Tarjan-versus-Kosaraju comparison.
 
 ## Representation refinement
 
@@ -78,15 +110,16 @@ procedure CANONICAL-CONDENSATION(vertex_count, input_edges)
     construct reverse adjacency by reversing every retained edge
     flatten both directions into validated CSR offsets and targets
 
-    components := ITERATIVE-TARJAN(forward_CSR, heap_owned_frames)
-    component_of := total map from every vertex to exactly one component
+    raw_component_of := ITERATIVE-TARJAN(forward_CSR, heap_owned_frames)
+    components, component_of := ASCENDING-DENSE-CANONICAL-SCAN(raw_component_of)
 
-    quotient_edges := empty ordered set
+    quotient_candidates := empty fixed-width pair vector
     for each source edge (u, v)
         if component_of[u] differs from component_of[v]
-            insert (component_of[u], component_of[v]) into quotient_edges
+            append (component_of[u], component_of[v]) to quotient_candidates
+    quotient_edges := FIXED-WIDTH-RADIX-SORT-AND-DEDUPLICATE(quotient_candidates)
 
-    ranks := deterministic longest-predecessor ranks over quotient_edges
+    ranks := deterministic linear longest-predecessor ranks over quotient_edges
     return components, component_of, quotient_edges, ranks
 end procedure
 ```
@@ -110,8 +143,10 @@ quotient and cannot carry the acyclicity evidence.
 
 ## Algorithmic reference
 
-The implementation baseline is Tarjan's depth-first SCC algorithm, represented iteratively with
-explicit heap frames. The semantic contract does not require a particular SCC algorithm; it
-requires the exact partition and the resource/lifecycle guarantees above. See Robert E. Tarjan,
+The implementation baseline is the workspace's established Tarjan depth-first SCC lineage,
+represented iteratively with explicit heap frames. libcpg supplies the primary production
+behavior, while PraTTaIL supplies an independently exhaustive four-vertex oracle and a 256-KiB
+small-stack gate. The campaign does not repeat the already-completed algorithm bake-off. See
+Robert E. Tarjan,
 “Depth-First Search and Linear Graph Algorithms,” *SIAM Journal on Computing* 1(2), 1972,
 [https://doi.org/10.1137/0201010](https://doi.org/10.1137/0201010).
