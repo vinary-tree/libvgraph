@@ -13,14 +13,14 @@ title libvgraph canonical-path work and heap contract
 
 rectangle "Validated canonical CSR\n<latex>|V|</latex> vertices; <latex>|E|</latex> edges" as csr #DBEAFE
 rectangle "Explicit-frame Tarjan\n<latex>5|V| + |E|</latex> exact events\n<latex>\leq 5|V|</latex> auxiliary vertex slots" as scc #C4B5FD
-rectangle "Exact quotient\none source-edge scan\nfixed-width radix canonicalization" as quotient #A7F3D0
+rectangle "Exact quotient\none source-edge scan\nsix 11-bit radix passes\n<latex>W_R=0</latex> if <latex>|R|<2</latex>\notherwise <latex>W_R=13|R|+24576</latex>" as quotient #A7F3D0
 rectangle "Ranks and waves\n<latex>3|C| + |Q|</latex> events" as waves #FDE68A
-rectangle "Composed upper bound\n<latex>5|V| + 2|E| + 3|C| + |Q|</latex>\n<latex>\leq 8|V| + 3|E|</latex>" as bound #FBCFE8
+rectangle "Composed exact work\n<latex>5|V| + 2|E| + W_R + 3|C| + |Q|</latex>\nupper bound <latex>\leq 8|V| + 16|E| + 24576</latex>" as bound #FBCFE8
 
 csr -[#2563EB,bold]-> scc : scan each CSR edge once
 scc -[#7C3AED,bold]-> quotient : total component map
 quotient -[#059669,bold]-> waves : canonical DAG
-waves -[#D97706,bold]-> bound : <latex>|C|\leq|V|,\ |Q|\leq|E|</latex>
+waves -[#D97706,bold]-> bound : <latex>|R|\leq|E|,\ |C|\leq|V|,\ |Q|\leq|E|</latex>
 
 note bottom of scc #EDE9FE
   No recursive control edge.
@@ -32,6 +32,7 @@ legend right
   |= Symbol |= Meaning |
   | <latex>V</latex> | source vertices |
   | <latex>E</latex> | canonical source edges |
+  | <latex>R</latex> | cross-component candidates |
   | <latex>C</latex> | SCC components |
   | <latex>Q</latex> | distinct quotient edges |
 endlegend

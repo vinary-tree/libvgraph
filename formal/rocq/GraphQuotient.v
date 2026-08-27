@@ -1,4 +1,4 @@
-From Stdlib Require Import List Arith Lia Sorting.Permutation.
+From Stdlib Require Import List Arith Lia Ring Sorting.Permutation.
 Import ListNotations.
 Set Implicit Arguments.
 
@@ -469,28 +469,99 @@ Proof.
   exact Hframes.
 Qed.
 
-(** The exact quotient and linear wavefront pipeline scans source edges once,
-    processes each quotient edge once, and processes each component three times
-    (indegree initialization, ready removal, and wave assignment). *)
+(** The dense quotient canonicalizer uses six 11-bit least-significant-digit
+    radix passes over [u64] component pairs. Each full pass scans the candidates
+    twice and the 2,048-entry bucket array twice: once to clear it and once to
+    form prefixes. The final deduplication scans the candidate vector once.
+    Inputs with fewer than two candidates take the exact zero-work fast path. *)
+Definition quotient_radix_bucket_count : nat := 2048.
+
+Definition quotient_radix_pass_count : nat := 6.
+
+Definition quotient_radix_fixed_work : nat :=
+  quotient_radix_pass_count * (2 * quotient_radix_bucket_count).
+
+Definition quotient_radix_work (candidate_count : nat) : nat :=
+  if candidate_count <? 2 then 0
+  else
+    quotient_radix_pass_count *
+      (2 * candidate_count + 2 * quotient_radix_bucket_count) +
+    candidate_count.
+
+Theorem quotient_radix_work_small_exact :
+  forall candidate_count,
+    candidate_count < 2 ->
+    quotient_radix_work candidate_count = 0.
+Proof.
+  intros candidate_count Hsmall.
+  unfold quotient_radix_work.
+  apply Nat.ltb_lt in Hsmall.
+  rewrite Hsmall.
+  reflexivity.
+Qed.
+
+Theorem quotient_radix_work_full_exact :
+  forall candidate_count,
+    2 <= candidate_count ->
+    quotient_radix_work candidate_count =
+      13 * candidate_count + quotient_radix_fixed_work.
+Proof.
+  intros candidate_count Hfull.
+  unfold quotient_radix_work, quotient_radix_fixed_work,
+    quotient_radix_pass_count.
+  destruct (candidate_count <? 2) eqn:Hsmall.
+  - apply Nat.ltb_lt in Hsmall.
+    lia.
+  - ring.
+Qed.
+
+Theorem quotient_radix_work_upper_bound :
+  forall candidate_count,
+    quotient_radix_work candidate_count <=
+      13 * candidate_count + quotient_radix_fixed_work.
+Proof.
+  intros candidate_count.
+  destruct (candidate_count <? 2) eqn:Hsmall.
+  - apply Nat.ltb_lt in Hsmall.
+    rewrite quotient_radix_work_small_exact by exact Hsmall.
+    lia.
+  - apply Nat.ltb_ge in Hsmall.
+    rewrite quotient_radix_work_full_exact by exact Hsmall.
+    lia.
+Qed.
+
+(** The complete quotient and linear-wavefront pipeline adds one source-edge
+    scan, the exact radix cost above, one scan per distinct quotient edge, and
+    three visits per component (indegree initialization, ready removal, and
+    wave assignment) to the exact Tarjan cost. *)
 Definition quotient_wavefront_work
-    (vertex_count edge_count component_count quotient_edge_count : nat) : nat :=
+    (vertex_count edge_count candidate_count component_count
+      quotient_edge_count : nat) : nat :=
   5 * vertex_count + 2 * edge_count +
+  quotient_radix_work candidate_count +
   3 * component_count + quotient_edge_count.
 
 Record quotient_dimensions
-    (vertex_count edge_count component_count quotient_edge_count : nat) : Prop := {
+    (vertex_count edge_count candidate_count component_count
+      quotient_edge_count : nat) : Prop := {
+  candidate_count_bounded : candidate_count <= edge_count;
   component_count_bounded : component_count <= vertex_count;
   quotient_edge_count_bounded : quotient_edge_count <= edge_count
 }.
 
 Theorem quotient_wavefront_work_linear :
-  forall vertex_count edge_count component_count quotient_edge_count,
-    quotient_dimensions vertex_count edge_count component_count quotient_edge_count ->
-    quotient_wavefront_work vertex_count edge_count component_count quotient_edge_count
-      <= 8 * vertex_count + 3 * edge_count.
+  forall vertex_count edge_count candidate_count component_count
+    quotient_edge_count,
+    quotient_dimensions vertex_count edge_count candidate_count component_count
+      quotient_edge_count ->
+    quotient_wavefront_work vertex_count edge_count candidate_count component_count
+      quotient_edge_count <=
+        8 * vertex_count + 16 * edge_count + quotient_radix_fixed_work.
 Proof.
-  intros vertex_count edge_count component_count quotient_edge_count Hdimensions.
+  intros vertex_count edge_count candidate_count component_count
+    quotient_edge_count Hdimensions.
   destruct Hdimensions.
+  pose proof (quotient_radix_work_upper_bound candidate_count) as Hradix.
   unfold quotient_wavefront_work.
   lia.
 Qed.
@@ -514,4 +585,7 @@ Print Assumptions complete_tarjan_work_exact.
 Print Assumptions complete_tarjan_work_linear.
 Print Assumptions tarjan_auxiliary_heap_linear.
 Print Assumptions iterative_control_native_stack_constant.
+Print Assumptions quotient_radix_work_small_exact.
+Print Assumptions quotient_radix_work_full_exact.
+Print Assumptions quotient_radix_work_upper_bound.
 Print Assumptions quotient_wavefront_work_linear.

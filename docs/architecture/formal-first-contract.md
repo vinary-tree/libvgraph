@@ -53,12 +53,14 @@ A future implementation is admitted only when all answers are “yes.”
 10. Do Rocq, TLC, the exhaustive oracle, Rust tests, strict lint, and documentation lint all pass?
 11. On canonical CSR, does SCC work equal $`5|V| + |E|`$ logical events and stay within
     $`5|V|`$ auxiliary vertex slots, excluding returned output?
-12. Do quotient construction and wavefront scheduling keep the complete bound at or below
-    $`8|V| + 3|E|`$, using $`|C| \le |V|`$ and $`|Q| \le |E|`$?
+12. Does quotient construction expose the exact six-pass radix cost, including both bucket-array
+    scans per pass and final deduplication, and keep the complete bound at or below
+    $`8|V| + 16|E| + 24{,}576`$, using $`|R| \le |E|`$, $`|C| \le |V|`$, and
+    $`|Q| \le |E|`$?
 13. Does a source and call-graph census establish zero recursive control edges on every public
     input-depth-sensitive path?
 
-The symbols $`V`$ and $`E`$ denote source vertices and canonical source edges. The symbols $`C`$
-and $`Q`$ denote SCC components and distinct condensation edges. Returned graph and partition
-storage is output, whereas temporary arrays, queues, stacks, and sorting buffers are auxiliary
-storage.
+The symbols $`V`$ and $`E`$ denote source vertices and canonical source edges. The symbol $`R`$
+denotes cross-component candidates before quotient deduplication. The symbols $`C`$ and $`Q`$
+denote SCC components and distinct condensation edges. Returned graph and partition storage is
+output, whereas temporary arrays, queues, stacks, and sorting buffers are auxiliary storage.

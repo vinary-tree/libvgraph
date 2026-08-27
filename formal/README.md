@@ -6,8 +6,9 @@ The formal artifacts precede production implementation.
   nonemptiness, quotient-edge witness equivalence, condensation acyclicity, bidirectional
   renaming preservation, permutation/duplicate/extensional enumeration invariance, and wavefront
   independence. It additionally proves exact $`5|V| + |E|`$ work for a complete canonical SCC
-  trace, an auxiliary-heap bound of $`5|V|`$ slots, constant native control depth, and an
-  end-to-end quotient/wavefront upper bound of $`8|V| + 3|E|`$. `Print Assumptions` output must
+  trace, an auxiliary-heap bound of $`5|V|`$ slots, constant native control depth, the exact
+  piecewise cost of six-pass 11-bit quotient radix canonicalization, and an end-to-end
+  quotient/wavefront upper bound of $`8|V| + 16|E| + 24{,}576`$. `Print Assumptions` output must
   report a closed global context for every acceptance theorem.
 - `tla/IterativeGraphMachine.tla` models a finite explicit-frame traversal with completion and
   cancellation. TLC checks type, ownership, uniqueness, frame bounds, exact discovery/edge/frame

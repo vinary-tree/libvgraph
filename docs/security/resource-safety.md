@@ -19,8 +19,10 @@ amplification, duplicate-edge amplification, native-stack exhaustion, or false c
 - Keep canonical-CSR SCC work at exactly $`5|V| + |E|`$ logical events and its auxiliary
   vertex-slot peak at or below $`5|V|`$; reject an implementation whose hidden canonicalization
   changes that bound.
-- Use nonrecursive fixed-width canonicalization for dense quotient edges. Do not call a recursive
-  comparison sort from an input-depth-sensitive public path.
+- Use nonrecursive fixed-width canonicalization for dense quotient edges. Charge both
+  $`2{,}048`$-bucket scans in every one of the six full radix passes, both candidate scans per
+  pass, and final deduplication; do not hide fixed scans behind asymptotic notation. Do not call a
+  recursive comparison sort from an input-depth-sensitive public path.
 - Treat cancellation and cap exhaustion as incomplete outcomes. They cannot certify acyclicity,
   reachability absence, or exact completion.
 - Keep public ordering deterministic so attacker-controlled insertion order cannot perturb caches,

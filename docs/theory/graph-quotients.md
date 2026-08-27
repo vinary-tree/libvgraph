@@ -49,9 +49,10 @@ lifecycle, its frame bound, and exact operational work accounting.
 
 ## Complexity and native-stack contract
 
-Let $`|V|`$ be the canonical vertex count, $`|E|`$ the canonical edge count, $`|C|`$ the SCC
-count, and $`|Q|`$ the distinct condensation-edge count. A complete explicit-frame Tarjan trace
-performs exactly:
+Let $`|V|`$ be the canonical vertex count, $`|E|`$ the canonical edge count, $`|R|`$ the number
+of cross-component edge candidates before quotient deduplication, $`|C|`$ the strongly connected
+component (SCC) count, and $`|Q|`$ the distinct condensation-edge count. A complete explicit-frame
+Tarjan trace performs exactly:
 
 ```math
 |V|_{\mathrm{roots}} + |V|_{\mathrm{discoveries}} + |E|_{\mathrm{edges}} +
@@ -64,20 +65,38 @@ and explicit frame stack each peak at no more than $`|V|`$ entries. Excluding re
 the SCC auxiliary bound is therefore $`5|V|`$ vertex-sized slots. The implementation has no
 recursive control edge; graph depth changes heap-vector lengths, not native call depth.
 
-Exact quotient construction scans source edges once. Linear wavefront construction initializes,
-removes, and assigns each component once and scans each quotient edge once. Because
-$`|C| \le |V|`$ and $`|Q| \le |E|`$, the composed work satisfies:
+Exact quotient construction scans source edges once. Its nonrecursive least-significant-digit
+radix canonicalizer uses six 11-bit passes over 64-bit component pairs and $`2{,}048`$ buckets.
+Each full pass scans the candidates twice and the bucket array twice: once to clear counts and once
+to form prefixes. Deduplication adds one candidate scan. The fewer-than-two-candidates fast path
+does no radix work, so its exact logical cost is:
 
 ```math
-5|V| + 2|E| + 3|C| + |Q| \le 8|V| + 3|E|.
+W_{\mathrm{radix}}(|R|) =
+\begin{cases}
+0, & |R| < 2, \\
+6(2|R| + 2(2{,}048)) + |R|
+  = 13|R| + 24{,}576, & |R| \ge 2.
+\end{cases}
+```
+
+Linear wavefront construction initializes, removes, and assigns each component once and scans
+each quotient edge once. The complete exact expression is therefore
+$`5|V| + 2|E| + W_{\mathrm{radix}}(|R|) + 3|C| + |Q|`$. Because $`|R| \le |E|`$,
+$`|C| \le |V|`$, and $`|Q| \le |E|`$, its uniform upper bound is:
+
+```math
+5|V| + 2|E| + W_{\mathrm{radix}}(|R|) + 3|C| + |Q|
+\le 8|V| + 16|E| + 24{,}576.
 ```
 
 ![Linear work and heap bounds across the canonical pipeline](../diagrams/linear-work-bound.svg)
 
-These are logical-operation bounds, not wall-clock predictions. Production acceptance also
-measures cache misses, allocations, peak resident memory, and throughput on relevant Vinary
-workloads. It reuses libcpg's established choice of iterative Tarjan rather than repeating an
-already-settled Tarjan-versus-Kosaraju comparison.
+These are logical loop-iteration bounds, not instruction counts or wall-clock predictions. The
+radix bound exposes both fixed bucket scans instead of hiding them in asymptotic notation.
+Production acceptance also measures cache misses, allocations, peak resident memory, and
+throughput on relevant Vinary workloads. It reuses libcpg's established choice of iterative
+Tarjan rather than repeating an already-settled Tarjan-versus-Kosaraju comparison.
 
 ## Representation refinement
 

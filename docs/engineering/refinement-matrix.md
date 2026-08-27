@@ -21,7 +21,7 @@ tests alone is insufficient unless those tests exercise the mapped obligation be
 | Strict-linear SCC work | Instrumented production counters equal $`5\lvert V\rvert + \lvert E\rvert`$ on canonical CSR and scale proportionally on deep, wide, sparse, dense, and adversarial graphs |
 | Linear SCC auxiliary space | Allocation/peak-state evidence stays within the declared $`5\lvert V\rvert`$ vertex-slot model, excluding returned output |
 | Constant native control depth | Source and call-graph census finds no recursive edge on input-depth-sensitive paths; small-stack tests cover all public lifecycle operations |
-| Linear quotient and waves | Counted work is at most $`8\lvert V\rvert + 3\lvert E\rvert`$ for SCC, exact quotient construction, and wavefront ranking |
+| Linear quotient and waves | Counted work uses the exact piecewise six-pass radix charge and is at most $`8\lvert V\rvert + 16\lvert E\rvert + 24{,}576`$ for SCC, exact quotient construction, and wavefront ranking |
 | Cancellation and limits | Exhaustion returns a structured incomplete result and never certifies exact completion |
 
 ## Malformed-representation matrix
