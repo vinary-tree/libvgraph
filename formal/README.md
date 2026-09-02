@@ -37,9 +37,17 @@ The formal artifacts precede production implementation.
   constant native control depth, and tagged digest-preimage separation. Nineteen acceptance
   theorems must report a closed global context.
 - `tla/InteropCodecMachine.tla` checks two concurrent requests across eleven input
-  classes, cancellation, publication, and release. The positive model reaches 16,900 distinct
-  states. Three causal configurations must violate `PublicationSound` when schema,
-  canonicality, or cancellation enforcement is removed.
+  classes, cancellation, publication, and resource release. The positive model generates 33,270
+  states, reaches 16,900 distinct states at depth 15, and preserves native control depth one. Three
+  causal configurations must violate `PublicationSound` when schema, canonicality, or cancellation
+  enforcement is removed; a fourth must violate `NativeControlDepthBound` when a native frame is
+  grown per read step.
+- `tla/ReleaseMachine.tla` checks the external publication boundary over every Boolean trust/gate
+  combination and absent, matching, and mismatched registry states. The positive model generates
+  178 states, reaches 130 distinct states at depth 7, and requires protected signer policy,
+  identity with protected default-branch head, successful gates, draft-before-assets ordering,
+  complete evidence, equal package/registry hashes, and at most one publication. Seven causal
+  configurations each remove exactly one control and must violate its targeted invariant.
 - `smt/interop_snapshot.smt2` proves nine unsatisfiable overflow, bound, separation, and
   fail-closed obligations and produces two constructive satisfiable models.
 - `model/exhaustive_interop.rs` refines the exact 80-byte header, little-endian payload, returned
@@ -47,8 +55,8 @@ The formal artifacts precede production implementation.
   1,593 profile encodings, 9,321 lawful renamings, 180,696 strict prefixes, two golden vectors,
   targeted corruptions, and a 100,000-vertex 64 KiB-stack lifecycle.
 - `verus/interop_refinement.rs` proves six Rust-shaped arithmetic, admission, cursor,
-  and work refinements. `doc/interop-invariants.tsv` maps 65 obligations bijectively onto
-  thirteen required-red production properties.
+  and work refinements. `doc/interop-invariants.tsv` maps 74 obligations bijectively onto
+  fourteen required-red production properties.
 
 Run:
 
@@ -62,9 +70,9 @@ Run only the snapshot/digest contract:
 scripts/verify-formal.sh interop
 ```
 
-The interop target succeeds only when all positive layers pass, all four causal mutants fail on
-their intended invariant, and the required-red suite fails solely at the unresolved
-`libvgraph_interop` import.
+The interop target succeeds only when all positive layers pass, all four codec and seven release
+causal mutants fail on their intended invariants, and the required-red suite fails solely at the
+unresolved `libvgraph_interop` import.
 
 The default command checks all six layers. Each layer runs in a transient systemd user scope with
 `MemorySwapMax=0`, one Cargo build job, and an explicit resident-memory ceiling. Rocq, TLA+/TLC,

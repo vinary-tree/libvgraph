@@ -65,3 +65,11 @@ INT-063	Stale digest never publishes required red	RequiredRed	tests/interop_cont
 INT-064	Exact version policy is executable required red	RequiredRed	tests/interop_contract_properties.rs	contract_exact_cross_version_policy	contract_exact_cross_version_policy
 INT-065	No unmodeled snapshot API is silently accepted	RequiredRed	tests/interop_contract_properties.rs	libvgraph_interop	contract_schema_rejection
 INT-066	Native-depth growth causes the control-depth invariant to fail	TLC	formal/tla/InteropCodecMachine.tla	GrowNativeDepth	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-067	A published release is authorized only by the protected signer policy	TLC	formal/tla/ReleaseMachine.tla	PublishedUsesProtectedTrust	contract_release_publication_is_fail_closed
+INT-068	A published tag resolves to the protected default-branch head	TLC	formal/tla/ReleaseMachine.tla	PublishedUsesProtectedHead	contract_release_publication_is_fail_closed
+INT-069	A published release has passed and recorded every acceptance gate	TLC	formal/tla/ReleaseMachine.tla	PublishedHasPassedGates	contract_release_publication_is_fail_closed
+INT-070	A release is drafted before any publication transition	TLC	formal/tla/ReleaseMachine.tla	PublishedFromDraft	contract_release_publication_is_fail_closed
+INT-071	A published release has the exact package and complete evidence assets	TLC	formal/tla/ReleaseMachine.tla	PublishedHasCompleteAssets	contract_release_publication_is_fail_closed
+INT-072	The registry artifact hash equals the verified package hash before publication	TLC	formal/tla/ReleaseMachine.tla	PublishedRegistryMatches	contract_release_publication_is_fail_closed
+INT-073	One version can cross the publication transition at most once	TLC	formal/tla/ReleaseMachine.tla	AtMostOnePublication	contract_release_publication_is_fail_closed
+INT-074	A rejected candidate can never become published	TLC	formal/tla/ReleaseMachine.tla	RejectedNeverPublishes	contract_release_publication_is_fail_closed

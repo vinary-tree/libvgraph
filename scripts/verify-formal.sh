@@ -88,9 +88,62 @@ verify_tla_interop() {
   done
 }
 
+verify_tla_release() {
+  cd "$repository_root/formal/tla"
+  tla2sany ReleaseMachine.tla 2>&1 \
+    | tee "$evidence_directory/release-tla-syntax.log"
+  tlc -workers 1 -deadlock \
+    -metadir "$evidence_directory/release-tlc-positive-state" \
+    -config ReleaseMachine.cfg ReleaseMachine.tla 2>&1 \
+    | tee "$evidence_directory/release-tlc-positive.log"
+  rg -q 'Model checking completed. No error has been found' \
+    "$evidence_directory/release-tlc-positive.log"
+  rg -q '178 states generated, 130 distinct states found' \
+    "$evidence_directory/release-tlc-positive.log"
+
+  local configurations=(
+    ReleaseMachineCandidatePolicy.cfg
+    ReleaseMachineSkipProtectedHead.cfg
+    ReleaseMachineSkipGates.cfg
+    ReleaseMachinePublishEarly.cfg
+    ReleaseMachineSkipEvidence.cfg
+    ReleaseMachineSkipRegistryChecksum.cfg
+    ReleaseMachineRepublish.cfg
+  )
+  local labels=(
+    candidate-policy protected-head gates early-publication evidence registry-checksum republish
+  )
+  local invariants=(
+    PublishedUsesProtectedTrust
+    PublishedUsesProtectedHead
+    PublishedHasPassedGates
+    PublishedFromDraft
+    PublishedHasCompleteAssets
+    PublishedRegistryMatches
+    AtMostOnePublication
+  )
+  local index
+  for index in "${!configurations[@]}"; do
+    local log="$evidence_directory/release-tlc-mutant-${labels[$index]}.log"
+    set +e
+    tlc -workers 1 -deadlock \
+      -metadir "$evidence_directory/release-tlc-mutant-${labels[$index]}-state" \
+      -config "${configurations[$index]}" ReleaseMachine.tla 2>&1 | tee "$log"
+    local status="${PIPESTATUS[0]}"
+    set -e
+    if [[ "$status" -eq 0 ]]; then
+      printf 'release %s mutant unexpectedly satisfied the model\n' \
+        "${labels[$index]}" >&2
+      return 1
+    fi
+    rg -q "Invariant ${invariants[$index]} is violated" "$log"
+  done
+}
+
 verify_tla() {
   verify_tla_core
   verify_tla_interop
+  verify_tla_release
 }
 
 verify_exhaustive_model() {
@@ -160,6 +213,7 @@ verify_interop() {
   verify_boundary
   verify_rocq
   verify_tla_interop
+  verify_tla_release
   verify_exhaustive_model
   verify_verus
   verify_smt_interop
@@ -205,6 +259,9 @@ case "${1:-all}" in
   interop-tla)
     verify_tla_interop
     ;;
+  release-tla)
+    verify_tla_release
+    ;;
   model)
     verify_exhaustive_model
     ;;
@@ -245,7 +302,7 @@ case "${1:-all}" in
     ;;
   *)
     printf '%s\n' \
-      'usage: scripts/verify-formal.sh [all|boundary|rocq|tla|model|verus|kani|interop|interop-rocq|interop-tla|interop-model|interop-verus|interop-smt|interop-invariants|interop-required-red]' \
+      'usage: scripts/verify-formal.sh [all|boundary|rocq|tla|model|verus|kani|interop|interop-rocq|interop-tla|release-tla|interop-model|interop-verus|interop-smt|interop-invariants|interop-required-red]' \
       >&2
     exit 2
     ;;

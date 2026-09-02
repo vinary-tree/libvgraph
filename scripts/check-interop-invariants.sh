@@ -15,8 +15,8 @@ if [[ "$actual_header" != "$expected_header" ]]; then
 fi
 
 row_count="$(awk 'NR > 1 { count += 1 } END { print count + 0 }' "$ledger")"
-if [[ "$row_count" -ne 66 ]]; then
-  printf 'expected 66 interop invariant rows, found %s\n' "$row_count" >&2
+if [[ "$row_count" -ne 74 ]]; then
+  printf 'expected 74 interop invariant rows, found %s\n' "$row_count" >&2
   exit 1
 fi
 
@@ -74,6 +74,7 @@ if rg -n '\b(TODO|FIXME|HACK|XXX|PENDING)\b' \
     "$ledger" "$properties" \
     "$repository_root/formal/rocq/GraphSnapshot.v" \
     "$repository_root/formal/tla/InteropCodecMachine.tla" \
+    "$repository_root/formal/tla/ReleaseMachine.tla" \
     "$repository_root/formal/smt/interop_snapshot.smt2" \
     "$repository_root/formal/model/exhaustive_interop.rs" \
     "$repository_root/formal/verus/interop_refinement.rs"; then
@@ -81,5 +82,5 @@ if rg -n '\b(TODO|FIXME|HACK|XXX|PENDING)\b' \
   exit 1
 fi
 
-printf 'verified %s interop invariants across Rocq, TLC, Z3, model, Verus, and required-red layers\n' \
+printf 'verified %s interop and release invariants across Rocq, TLC, Z3, model, Verus, and required-red layers\n' \
   "$row_count"

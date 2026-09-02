@@ -316,3 +316,74 @@ fn contract_deep_codec_lifecycle_is_native_stack_independent() {
         .join()
         .expect("the small-stack contract thread must complete");
 }
+
+#[derive(Clone, Copy)]
+struct ReleaseEvidence {
+    protected_signer: bool,
+    protected_head: bool,
+    gates_passed: bool,
+    draft_created: bool,
+    assets_complete: bool,
+    registry_matches: bool,
+    publication_count: u8,
+}
+
+fn release_publishable(evidence: ReleaseEvidence) -> bool {
+    evidence.protected_signer
+        && evidence.protected_head
+        && evidence.gates_passed
+        && evidence.draft_created
+        && evidence.assets_complete
+        && evidence.registry_matches
+        && evidence.publication_count == 1
+}
+
+#[test]
+fn contract_release_publication_is_fail_closed() {
+    let complete = ReleaseEvidence {
+        protected_signer: true,
+        protected_head: true,
+        gates_passed: true,
+        draft_created: true,
+        assets_complete: true,
+        registry_matches: true,
+        publication_count: 1,
+    };
+    assert!(release_publishable(complete));
+
+    let rejected = [
+        ReleaseEvidence {
+            protected_signer: false,
+            ..complete
+        },
+        ReleaseEvidence {
+            protected_head: false,
+            ..complete
+        },
+        ReleaseEvidence {
+            gates_passed: false,
+            ..complete
+        },
+        ReleaseEvidence {
+            draft_created: false,
+            ..complete
+        },
+        ReleaseEvidence {
+            assets_complete: false,
+            ..complete
+        },
+        ReleaseEvidence {
+            registry_matches: false,
+            ..complete
+        },
+        ReleaseEvidence {
+            publication_count: 0,
+            ..complete
+        },
+        ReleaseEvidence {
+            publication_count: 2,
+            ..complete
+        },
+    ];
+    assert!(rejected.into_iter().all(|case| !release_publishable(case)));
+}
