@@ -228,7 +228,7 @@ fn exact_work_profiles_limits_and_auxiliary_bounds_refine_the_proof() {
     assert_eq!(profile.radix_work(), 26_666);
     assert_eq!(profile.condensation_work(), 31);
     assert_eq!(profile.decomposition_work(), 26_756);
-    assert_eq!(profile.tarjan_auxiliary_slots_upper_bound(), 20);
+    assert_eq!(profile.tarjan_auxiliary_slots_upper_bound(), 24);
     assert_eq!(profile.decomposition_auxiliary_slots_upper_bound(), 2_082);
     assert_eq!(profile.pipeline_auxiliary_slots_upper_bound(), 2_090);
 

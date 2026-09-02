@@ -3,12 +3,15 @@ set -euo pipefail
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 evidence_directory="$repository_root/target/verification"
-mkdir -p "$evidence_directory"
+repository_tmp="$repository_root/target/tmp"
+mkdir -p "$evidence_directory" "$repository_tmp"
 
 if [[ "${LIBVGRAPH_DOCS_SCOPED:-0}" != 1 ]]; then
   exec systemd-run --user --scope \
-    -p MemoryMax=4G -p MemorySwapMax=0 -p CPUQuota=400% -p TasksMax=64 \
-    env LIBVGRAPH_DOCS_SCOPED=1 "$repository_root/scripts/verify-docs.sh"
+    -p MemoryMax=4G -p MemorySwapMax=0 -p CPUQuota=100% -p TasksMax=64 \
+    env LIBVGRAPH_DOCS_SCOPED=1 TMPDIR="$repository_tmp" \
+    JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Djava.io.tmpdir=$repository_tmp" \
+    "$repository_root/scripts/verify-docs.sh"
 fi
 
 "$repository_root/scripts/render-diagrams.sh"

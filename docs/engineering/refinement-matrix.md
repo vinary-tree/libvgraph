@@ -17,15 +17,15 @@ tests alone is insufficient unless those tests exercise the mapped obligation be
 | Condensation acyclicity | Topological traversal visits every component and rejects inconsistent imported data |
 | Renaming equivariance | Property tests compare the induced component bijection, quotient edges, and ranks |
 | Enumeration invariance | Input edge permutations and duplicates produce identical canonical bytes |
-| Stack safety | Deep/wide construction, SCC, quotient, formatting, serialization, clone, and drop on a 256 KiB thread |
+| Stack safety | Deep/wide construction, SCC, quotient, formatting, clone, and drop on a 256 KiB thread |
 | Strict-linear SCC work | Instrumented production counters equal $`5\lvert V\rvert + \lvert E\rvert`$ on canonical CSR and scale proportionally on deep, wide, sparse, dense, and adversarial graphs |
-| Linear SCC auxiliary space | Allocation/peak-state evidence stays within the declared $`5\lvert V\rvert`$ vertex-slot model, excluding returned output |
+| Linear SCC auxiliary space | Allocation/peak-state evidence stays within $`5\lvert V\rvert + \lvert C\rvert \le 6\lvert V\rvert`$ logical entries, excluding returned output |
 | Constant native control depth | Source and call-graph census finds no recursive edge on input-depth-sensitive paths; small-stack tests cover all public lifecycle operations |
 | Phase-complete linear work | Counted work includes initialization, flat fibers, exact radix preparation/passes/deduplication, paired condensation CSR, and flat wave materialization; it is at most $`27\lvert V\rvert + 20\lvert E\rvert + 26{,}628`$ |
 | Complete auxiliary space | Reusable temporary storage is at most $`9\lvert V\rvert + 2\lvert E\rvert + 2{,}048`$ slots, excluding returned values |
 | Cancellation and limits | Exhaustion returns a structured incomplete result and never certifies exact completion |
 | Flat schedule allocation | `schedule_impl` performs a constant number of allocations independent of the wave count; no wave owns a nested vector |
-| Versioned serialization | Feature-gated deserialization accepts format version 1 only and routes every decoded CSR through `try_from_parts` before traversal |
+| Neutral core boundary | Cargo metadata and source checks prove that serialization, hashing, schema identity, and provenance remain outside the kernel |
 | Concrete arithmetic safety | Kani proves pair encoding, radix charge arithmetic, fail-atomic work admission, and bounded production flat-wave materialization |
 | General arithmetic refinement | Verus proves flat storage and schedule/pipeline work bounds for arbitrary natural-number parameters satisfying the graph inequalities |
 
@@ -33,7 +33,7 @@ tests alone is insufficient unless those tests exercise the mapped obligation be
 
 The validator must cover empty offsets, wrong offset length, nonzero first offset, decreasing
 offsets, a terminal offset beyond or before the target count, out-of-range targets, unsorted or
-duplicate adjacency entries, mismatched reverse edges, payload-length mismatch, and integer
+duplicate adjacency entries, mismatched reverse edges, stable-node ordering failures, and integer
 conversion overflow. Each case must return a stable structured error before indexed traversal.
 
 ## Deterministic concurrency condition

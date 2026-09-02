@@ -13,7 +13,7 @@ buckets.
 | Dense-identity construction | $`O(V + I_E + B)`$ | $`O(I_E + V + B)`$ | Six fixed 11-bit radix passes, CSR assembly, optional transpose |
 | CSR validation or transpose | $`O(V + E)`$ | $`O(V + E)`$ for a returned transpose | Every offset, target, and edge is inspected a constant number of times |
 | Breadth- or depth-first traversal | $`O(V_r + E_r)`$ | $`O(V)`$ | $`V_r`$ and $`E_r`$ are reached vertices and scanned outgoing edges; discovery occurs before queue/stack insertion |
-| SCC semantic trace | exactly $`5V + E`$ events | at most $`5V`$ temporary slots | Iterative Tarjan with heap-owned frames and active stack |
+| SCC semantic trace | exactly $`5V + E`$ events | at most $`5V + C \le 6V`$ temporary logical entries | Iterative Tarjan with heap-owned frames, active stack, and raw-component sizes |
 | Exact decomposition and quotient | linear word-RAM bound | at most $`5V + 4C + 2R + B`$ reusable slots | Flat fibers, fixed-width quotient radix, paired condensation CSR |
 | Wavefront schedule | exactly $`6C + Q + 3W + 1`$ events | three transient vectors; two returned vectors | FIFO Kahn traversal, ranks, stable flat-wave placement |
 
@@ -73,7 +73,8 @@ per worker rather than placing one behind a contended lock.
 
 The iterative Tarjan choice is inherited from libcpg's completed algorithm study. Do not repeat a
 Tarjan-versus-Kosaraju bake-off. New experiments target only libvgraph-specific changes: dense CSR
-construction, workspace reuse, flat-wave scheduling, consumer wave execution, and serialization.
+construction, workspace reuse, flat-wave scheduling, consumer wave execution, and boundary-free
+packaging.
 
 Every heavy benchmark or profiler capture runs in a no-swap systemd scope with explicit memory and
 CPU limits. Pre-register the graph family, size, build profile, sample count, and acceptance

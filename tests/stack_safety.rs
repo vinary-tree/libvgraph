@@ -122,14 +122,6 @@ fn every_depth_sensitive_public_lifecycle_is_stack_safe() {
             assert!(!format!("{graph:?}").is_empty());
             assert!(!format!("{decomposition:?}").is_empty());
             assert!(!format!("{schedule:?}").is_empty());
-            #[cfg(feature = "serde")]
-            {
-                let encoded = must(serde_json::to_vec(&graph));
-                let decoded: CsrGraph<u32> = must(serde_json::from_slice(&encoded));
-                assert_eq!(decoded, graph);
-                drop(decoded);
-                drop(encoded);
-            }
             drop(schedule_clone);
             drop(decomposition_clone);
             drop(graph_clone);

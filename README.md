@@ -10,6 +10,9 @@ component (SCC) quotients, condensation directed acyclic graphs (DAGs), and depe
 It preserves the semantics already exercised by `libcpg` while remaining independent of code
 property graphs, equality graphs, parsers, and weighted automata.
 
+The core has no serialization or hashing dependency. Portable snapshots, schema identities,
+digests, and provenance sidecars belong to the separately versioned `libvgraph-interop` boundary.
+
 On validated canonical CSR, the required SCC path is iterative, uses strict linear work, retains
 all graph-depth state on the heap, and preserves a constant native control depth. Arbitrary stable
 labels are canonicalized at a separately named comparison-model boundary so their unavoidable

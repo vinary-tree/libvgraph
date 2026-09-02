@@ -3,7 +3,8 @@ set -euo pipefail
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 evidence_directory="$repository_root/target/verification"
-mkdir -p "$evidence_directory"
+repository_tmp="$repository_root/target/tmp"
+mkdir -p "$evidence_directory" "$repository_tmp"
 
 verification_target="${1:-all}"
 if [[ "$verification_target" != all && "${LIBVGRAPH_FORMAL_SCOPED:-0}" != 1 ]]; then
@@ -11,11 +12,19 @@ if [[ "$verification_target" != all && "${LIBVGRAPH_FORMAL_SCOPED:-0}" != 1 ]]; 
   if [[ "$verification_target" == kani ]]; then
     memory_max=2G
   fi
+  java_tmp_option="-Djava.io.tmpdir=$repository_tmp"
+  java_tool_options="${JAVA_TOOL_OPTIONS:-} $java_tmp_option"
+  tla_java_options="${TLA_JAVA_OPTS:-} $java_tmp_option"
   exec systemd-run --user --scope \
-    -p MemoryMax="$memory_max" -p MemorySwapMax=0 -p CPUQuota=400% -p TasksMax=64 \
-    env LIBVGRAPH_FORMAL_SCOPED=1 CARGO_BUILD_JOBS=1 \
+    -p MemoryMax="$memory_max" -p MemorySwapMax=0 -p CPUQuota=100% -p TasksMax=64 \
+    env LIBVGRAPH_FORMAL_SCOPED=1 CARGO_BUILD_JOBS=1 TMPDIR="$repository_tmp" \
+    JAVA_TOOL_OPTIONS="$java_tool_options" TLA_JAVA_OPTS="$tla_java_options" \
     "$repository_root/scripts/verify-formal.sh" "$verification_target"
 fi
+
+verify_boundary() {
+  LIBVGRAPH_BOUNDARY_SCOPED=1 "$repository_root/scripts/check-core-boundary.sh"
+}
 
 verify_rocq() {
   cd "$repository_root/formal/rocq"
@@ -51,6 +60,9 @@ verify_verus() {
 
 verify_kani() {
   local kani_log="$evidence_directory/kani.log"
+  local lockfile="$repository_root/Cargo.lock"
+  local expected_lock_hash
+  expected_lock_hash="$(sha256sum "$lockfile" | cut -d ' ' -f 1)"
   local harnesses=(
     encoded_pairs_round_trip_without_aliasing
     radix_work_charge_is_exact_and_overflow_free_in_the_graph_domain
@@ -59,12 +71,19 @@ verify_kani() {
   )
   : > "$kani_log"
   for harness in "${harnesses[@]}"; do
-    cargo kani --harness "$harness" 2>&1 | tee -a "$kani_log"
+    CARGO_NET_OFFLINE=true cargo kani --harness "$harness" 2>&1 | tee -a "$kani_log"
+    if [[ "$(sha256sum "$lockfile" | cut -d ' ' -f 1)" != "$expected_lock_hash" ]]; then
+      printf '%s\n' 'cargo-kani modified Cargo.lock; refusing non-locked proof evidence' >&2
+      return 1
+    fi
   done
   [[ "$(rg -c '^VERIFICATION:- SUCCESSFUL$' "$kani_log")" -eq "${#harnesses[@]}" ]]
 }
 
 case "${1:-all}" in
+  boundary)
+    verify_boundary
+    ;;
   rocq)
     verify_rocq
     ;;
@@ -81,6 +100,7 @@ case "${1:-all}" in
     verify_kani
     ;;
   all)
+    "$repository_root/scripts/verify-formal.sh" boundary
     "$repository_root/scripts/verify-formal.sh" rocq
     "$repository_root/scripts/verify-formal.sh" tla
     "$repository_root/scripts/verify-formal.sh" model
@@ -88,7 +108,7 @@ case "${1:-all}" in
     "$repository_root/scripts/verify-formal.sh" kani
     ;;
   *)
-    printf '%s\n' 'usage: scripts/verify-formal.sh [all|rocq|tla|model|verus|kani]' >&2
+    printf '%s\n' 'usage: scripts/verify-formal.sh [all|boundary|rocq|tla|model|verus|kani]' >&2
     exit 2
     ;;
 esac

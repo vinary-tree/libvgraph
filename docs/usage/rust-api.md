@@ -110,27 +110,13 @@ assert!(!cyclic.is_acyclic());
 Use one workspace per concurrent worker. Sharing a mutable workspace would require external
 synchronization and would erase its allocation-reuse advantage.
 
-## Serialize validated source graphs
+## Persist through the interop boundary
 
-Enable the `serde` feature to serialize `CsrGraph<K>`. The wire representation is explicitly
-versioned. Deserialization validates all CSR invariants before returning a graph.
+Core libvgraph intentionally exposes no serialization feature. A consumer that already has
+canonical arrays can reconstruct and validate a graph with `CsrGraph::try_from_parts`; portable
+snapshot bytes, schema identity, digesting, and provenance belong to the separately versioned
+`libvgraph-interop` crate. This separation keeps codecs and untrusted-input parsing out of graph
+analysis dependencies and hot loops.
 
-```toml
-[dependencies]
-libvgraph = { version = "0.1.0", features = ["serde"] }
-serde_json = "1"
-```
-
-```rust
-# use libvgraph::CsrGraph;
-# fn run() -> Result<(), Box<dyn std::error::Error>> {
-let graph = CsrGraph::from_edges(["a", "b"], [("a", "b")])?;
-let encoded = serde_json::to_vec(&graph)?;
-let decoded: CsrGraph<&str> = serde_json::from_slice(&encoded)?;
-assert_eq!(decoded, graph);
-# Ok(())
-# }
-```
-
-Derived SCC and schedule values are intentionally recomputed rather than deserialized. This keeps
-the validated source graph as the only persisted trust boundary.
+Derived SCC and schedule values are recomputed from the validated graph. A future interop format
+must not treat stale or forged derived data as authoritative merely because its bytes decode.

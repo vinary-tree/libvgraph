@@ -506,38 +506,56 @@ Proof.
   lia.
 Qed.
 
-(** Peak auxiliary heap slots for Tarjan, excluding the returned partition.
-    Three dense arrays have exactly [vertex_count] slots. The active stack and
-    explicit DFS-frame stack never exceed [vertex_count]. *)
+(** Peak auxiliary heap entries for Tarjan, excluding the returned partition.
+    Three dense arrays have exactly [vertex_count] entries. The active stack
+    and explicit DFS-frame stack never exceed [vertex_count]. The temporary
+    raw-component-size table has exactly [component_count] entries. *)
 Record tarjan_heap_counts := {
   discovery_slots : nat;
   low_link_slots : nat;
   raw_component_slots : nat;
   peak_active_slots : nat;
-  peak_frame_slots : nat
+  peak_frame_slots : nat;
+  raw_component_size_slots : nat
 }.
 
 Definition tarjan_heap_slots (counts : tarjan_heap_counts) : nat :=
   discovery_slots counts + low_link_slots counts + raw_component_slots counts +
-  peak_active_slots counts + peak_frame_slots counts.
+  peak_active_slots counts + peak_frame_slots counts +
+  raw_component_size_slots counts.
 
 Record bounded_tarjan_heap
-    (vertex_count : nat) (counts : tarjan_heap_counts) : Prop := {
+    (vertex_count component_count : nat) (counts : tarjan_heap_counts) : Prop := {
   discovery_slots_exact : discovery_slots counts = vertex_count;
   low_link_slots_exact : low_link_slots counts = vertex_count;
   raw_component_slots_exact : raw_component_slots counts = vertex_count;
   active_slots_bounded : peak_active_slots counts <= vertex_count;
-  frame_slots_bounded : peak_frame_slots counts <= vertex_count
+  frame_slots_bounded : peak_frame_slots counts <= vertex_count;
+  raw_component_size_slots_exact :
+    raw_component_size_slots counts = component_count;
+  heap_component_count_bounded : component_count <= vertex_count
 }.
 
-Theorem tarjan_auxiliary_heap_linear :
-  forall vertex_count counts,
-    bounded_tarjan_heap vertex_count counts ->
-    tarjan_heap_slots counts <= 5 * vertex_count.
+Theorem tarjan_auxiliary_heap_dimension_bound :
+  forall vertex_count component_count counts,
+    bounded_tarjan_heap vertex_count component_count counts ->
+    tarjan_heap_slots counts <= 5 * vertex_count + component_count.
 Proof.
-  intros vertex_count counts Hheap.
+  intros vertex_count component_count counts Hheap.
   destruct Hheap.
   unfold tarjan_heap_slots.
+  lia.
+Qed.
+
+Theorem tarjan_auxiliary_heap_linear :
+  forall vertex_count component_count counts,
+    bounded_tarjan_heap vertex_count component_count counts ->
+    tarjan_heap_slots counts <= 6 * vertex_count.
+Proof.
+  intros vertex_count component_count counts Hheap.
+  pose proof (@tarjan_auxiliary_heap_dimension_bound
+    vertex_count component_count counts Hheap) as Hdimension.
+  destruct Hheap.
   lia.
 Qed.
 
@@ -734,6 +752,7 @@ Print Assumptions flat_wave_returned_buffer_count_constant.
 Print Assumptions flat_wave_returned_slots_exact.
 Print Assumptions complete_tarjan_work_exact.
 Print Assumptions complete_tarjan_work_linear.
+Print Assumptions tarjan_auxiliary_heap_dimension_bound.
 Print Assumptions tarjan_auxiliary_heap_linear.
 Print Assumptions iterative_control_native_stack_constant.
 Print Assumptions quotient_radix_work_small_exact.

@@ -67,9 +67,17 @@ The cost model charges one unit for each explicit loop iteration and each elemen
 input-dependent bulk operation. Capacity reservation without element initialization is governed by
 memory limits and is not charged as loop work.
 
-The discovery, low-link, and raw-component arrays each contain $`|V|`$ slots. The active stack
-and explicit frame stack each peak at no more than $`|V|`$ entries. Excluding returned output,
-the Tarjan-only auxiliary bound is therefore $`5|V|`$ vertex-sized slots. The implementation has
+The discovery, low-link, and raw-component arrays each contain $`|V|`$ logical entries. The
+active stack and explicit frame stack each peak at no more than $`|V|`$ entries. The temporary
+raw-component-size table contains exactly $`|C|`$ entries. Excluding returned output, the
+Tarjan-only auxiliary bound is therefore:
+
+```math
+5|V| + |C| \le 6|V|.
+```
+
+An entry is one element of a named logical buffer; this is an asymptotic storage account rather
+than a claim that differently typed elements have identical byte widths. The implementation has
 no recursive control edge; graph depth changes heap-vector lengths, not native call depth.
 
 The nonrecursive least-significant-digit radix canonicalizer uses six 11-bit passes over 64-bit

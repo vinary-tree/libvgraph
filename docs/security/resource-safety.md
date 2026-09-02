@@ -2,8 +2,8 @@
 
 ## Threat model
 
-The graph kernel may receive adversarial vertices, edges, serialized CSR fields, resource limits,
-or cancellation timing. Inputs can attempt integer overflow, out-of-range indexing, allocation
+The graph kernel may receive adversarial vertices, edges, imported CSR fields, resource limits, or
+cancellation timing. Inputs can attempt integer overflow, out-of-range indexing, allocation
 amplification, duplicate-edge amplification, native-stack exhaustion, or false completion.
 
 ## Required defenses
@@ -17,9 +17,9 @@ amplification, duplicate-edge amplification, native-stack exhaustion, or false c
   controls during analysis.
 - Keep input-depth traversal state in heap-owned vectors or queues; never map graph depth to native
   recursion depth.
-- Keep canonical-CSR SCC work at exactly $`5|V| + |E|`$ logical events and its auxiliary
-  vertex-slot peak at or below $`5|V|`$; reject an implementation whose hidden canonicalization
-  changes that bound.
+- Keep canonical-CSR SCC work at exactly $`5|V| + |E|`$ logical events and its auxiliary peak at
+  or below $`5|V| + |C| \le 6|V|`$ logical entries; reject an implementation whose hidden
+  canonicalization changes that bound.
 - Use nonrecursive fixed-width canonicalization for dense quotient edges. Charge scratch and
   bucket initialization, both $`2{,}048`$-bucket scans in every one of the six full radix passes,
   both candidate scans per pass, and final deduplication. Also charge flat-fiber materialization,
@@ -40,13 +40,14 @@ sets. The exhaustive model exercises every graph with at most four vertices and 
 chain on a 256 KiB thread. Production acceptance raises lifecycle stress where feasible and adds
 malformed CSR, fuzzing, Kani, Verus, and sanitizer evidence.
 
-## Serialized CSR boundary
+## Portable representation boundary
 
-The optional `serde` feature uses an explicit format-version field. Version 1 stores stable nodes,
-forward offsets and targets, and either both reverse arrays or neither. Deserialization rejects an
-unknown version and a half-present reverse representation. It then calls `CsrGraph::try_from_parts`,
-which validates node ordering, offset shape and monotonicity, target ranges, strictly ordered
-adjacency, and exact reverse transposition before returning a traversable graph.
+libvgraph deliberately has no serializer, wire schema, digest, or provenance dependency. The
+separate `libvgraph-interop` layer owns bounded portable encoding and must reconstruct core graphs
+through `CsrGraph::try_from_parts`. That constructor validates node ordering, offset shape and
+monotonicity, target ranges, strictly ordered adjacency, and exact reverse transposition before
+returning a traversable graph.
 
-Serde support does not deserialize SCC decompositions or schedules. Those values are recomputed
-from the validated graph so stale or forged derived evidence cannot cross the trust boundary.
+Derived SCC decompositions and schedules are recomputed by the kernel rather than trusted as
+portable evidence. An interop format that later carries derived data must identify its schema and
+semantic profile and independently revalidate every derived invariant.

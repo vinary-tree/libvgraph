@@ -243,10 +243,14 @@ impl SccWorkProfile {
         self.decomposition_work + schedule.logical_work()
     }
 
-    /// Returns the proven Tarjan-only auxiliary slot bound.
+    /// Returns the proven Tarjan-only auxiliary logical-entry bound.
+    ///
+    /// The five vertex-bounded arrays/stacks contribute at most `5 * V`
+    /// entries. The temporary raw-component-size table contributes exactly
+    /// `C` more entries, for `5 * V + C <= 6 * V`.
     #[must_use]
     pub const fn tarjan_auxiliary_slots_upper_bound(self) -> u64 {
-        5 * self.vertex_count
+        5 * self.vertex_count + self.component_count
     }
 
     /// Returns the proven decomposition workspace upper bound, excluding

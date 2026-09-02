@@ -2,8 +2,6 @@ use core::fmt;
 
 /// Dense zero-based vertex identifier within one [`crate::CsrGraph`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(transparent))]
 #[repr(transparent)]
 pub struct DenseId(u32);
 
@@ -33,8 +31,6 @@ impl fmt::Display for DenseId {
 
 /// Dense zero-based identifier within one SCC decomposition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(transparent))]
 #[repr(transparent)]
 pub struct ComponentId(u32);
 

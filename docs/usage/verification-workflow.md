@@ -14,15 +14,22 @@ From the repository root, run:
 scripts/verify-formal.sh all
 ```
 
-The command must finish with 27 closed-context messages from Rocq, a no-error TLC completion, the
+The command must finish with 28 closed-context messages from Rocq, a no-error TLC completion, the
 exact exhaustive-oracle summary including exact linear Tarjan work and the 256 KiB stack gate,
-six Verus proofs with zero errors, and four successful Kani harnesses. A nonzero exit, resource-cap
-termination, or missing success marker fails the gate.
+six Verus proofs with zero errors, four successful Kani harnesses, and a successful neutral-core
+dependency-boundary check. A nonzero exit, resource-cap termination, or missing success marker
+fails the gate.
 
 Every individual layer self-launches through `systemd-run --user --scope`. The wrapper sets
-`MemorySwapMax=0`, `CARGO_BUILD_JOBS=1`, a 400% CPU quota, and a finite task limit. Kani is capped
-at 2 GiB; every other formal layer is capped at 4 GiB. Do not invoke Kani or CBMC directly for this
-repository.
+`MemorySwapMax=0`, `CARGO_BUILD_JOBS=1`, a 100% CPU quota, a finite task limit, and a repository
+temporary directory. Java's temporary directory is pinned to that same repository location so
+TLA+ cannot spill parser artifacts into memory-backed `/tmp`. Kani is capped at 2 GiB; every other
+formal layer is capped at 4 GiB. Do not invoke Kani or CBMC directly for this repository.
+
+The installed `cargo-kani` interface does not accept Cargo's `--locked` or `--offline` flags.
+The wrapper therefore sets `CARGO_NET_OFFLINE=true`, hashes `Cargo.lock` before verification, and
+rejects the evidence if any harness changes the lockfile. This is the Kani-specific refinement of
+the repository's locked, offline verification policy.
 
 Individual layers are available for proof development:
 
@@ -32,6 +39,7 @@ scripts/verify-formal.sh tla
 scripts/verify-formal.sh model
 scripts/verify-formal.sh verus
 scripts/verify-formal.sh kani
+scripts/verify-formal.sh boundary
 ```
 
 An individual pass helps localize a defect but does not replace the final `all` run.
@@ -54,12 +62,14 @@ Build and test commands are also heavy operations. Run them in a no-swap systemd
 
 ```bash
 systemd-run --user --scope \
-  -p MemoryMax=4G -p MemorySwapMax=0 -p CPUQuota=400% \
-  env CARGO_BUILD_JOBS=1 cargo test --all-targets --all-features
+  -p MemoryMax=4G -p MemorySwapMax=0 -p CPUQuota=100% -p TasksMax=64 \
+  env CARGO_BUILD_JOBS=1 TMPDIR="$PWD/target/tmp" \
+  cargo test --locked --offline --all-targets --all-features
 
 systemd-run --user --scope \
-  -p MemoryMax=4G -p MemorySwapMax=0 -p CPUQuota=400% \
-  env CARGO_BUILD_JOBS=1 cargo clippy --all-targets --all-features -- -D warnings
+  -p MemoryMax=4G -p MemorySwapMax=0 -p CPUQuota=100% -p TasksMax=64 \
+  env CARGO_BUILD_JOBS=1 TMPDIR="$PWD/target/tmp" \
+  cargo clippy --locked --offline --all-targets --all-features -- -D warnings
 ```
 
 ## Headless allocation evidence
@@ -69,11 +79,12 @@ systemd-run --user --scope \
 
 ```bash
 systemd-run --user --scope \
-  -p MemoryMax=4G -p MemorySwapMax=0 -p CPUQuota=400% \
-  heaptrack --record-only -o /tmp/libvgraph.heaptrack \
+  -p MemoryMax=4G -p MemorySwapMax=0 -p CPUQuota=100% -p TasksMax=64 \
+  env TMPDIR="$PWD/target/tmp" \
+  heaptrack --record-only -o target/verification/profiles/libvgraph.heaptrack \
   target/debug/examples/schedule_allocation_probe 100000
 
-heaptrack_print -f /tmp/libvgraph.heaptrack.zst \
+heaptrack_print -f target/verification/profiles/libvgraph.heaptrack.zst \
   --filter-bt-function schedule_impl -a -p -T -n 20
 ```
 

@@ -12,7 +12,7 @@ skinparam rectangle {
 title libvgraph canonical-path work and heap contract
 
 rectangle "Validated canonical CSR\n<latex>|V|</latex> vertices; <latex>|E|</latex> edges" as csr #DBEAFE
-rectangle "Explicit-frame Tarjan\n<latex>5|V| + |E|</latex> exact events\n<latex>\leq 5|V|</latex> auxiliary vertex slots" as scc #C4B5FD
+rectangle "Explicit-frame Tarjan\n<latex>5|V| + |E|</latex> exact events\n<latex>5|V|+|C|\leq 6|V|</latex> auxiliary logical entries" as scc #C4B5FD
 rectangle "Partition materialization\nworkspace initialization and flat fibers\n<latex>10|V|+|E|+3|C|+1</latex>" as partition #DDD6FE
 rectangle "Quotient canonicalization\none source-edge scan plus radix\n<latex>W_R=0</latex> if <latex>|R|<2</latex>\notherwise <latex>W_R=14|R|+26624</latex>" as quotient #A7F3D0
 rectangle "Paired condensation CSR\n<latex>5|C|+3|Q|+2</latex>" as condensation #99F6E4

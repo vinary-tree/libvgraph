@@ -6,7 +6,8 @@ The formal artifacts precede production implementation.
   nonemptiness, quotient-edge witness equivalence, condensation acyclicity, bidirectional
   renaming preservation, permutation/duplicate/extensional enumeration invariance, and wavefront
   independence. It additionally proves exact $`5|V| + |E|`$ work for a complete canonical SCC
-  trace, an auxiliary-heap bound of $`5|V|`$ slots, constant native control depth, the exact
+  trace, an auxiliary-heap bound of $`5|V| + |C| \le 6|V|`$ logical entries, constant native
+  control depth, the exact
   piecewise charge for radix workspace preparation and six-pass 11-bit canonicalization, and a
   phase-complete partition/condensation/wavefront upper bound of
   $`27|V| + 20|E| + 26{,}628`$. It also proves a complete reusable-workspace bound of
@@ -28,6 +29,9 @@ The formal artifacts precede production implementation.
   execute concrete production functions symbolically. They prove pair encoding round trips,
   radix-work arithmetic cannot overflow in the graph domain, work admission is fail-atomic, and
   the flat-wave buffers are sorted exact rank fibers for the bounded harness domain.
+- `scripts/check-core-boundary.sh` checks the Cargo metadata and source surface to ensure the
+  payload-free kernel has no serialization dependency or feature. Portable encoding, schema
+  identity, hashing, and provenance belong to `libvgraph-interop`.
 
 Run:
 
@@ -35,10 +39,12 @@ Run:
 scripts/verify-formal.sh
 ```
 
-The default command checks all five layers. Each layer runs in a transient systemd user scope with
+The default command checks all six layers. Each layer runs in a transient systemd user scope with
 `MemorySwapMax=0`, one Cargo build job, and an explicit resident-memory ceiling. Rocq, TLA+/TLC,
 the exhaustive model, and Verus receive 4 GiB; Kani/CBMC receives 2 GiB. A cap hit is a failed
 proof gate and must be addressed by reducing verifier state, not by silently increasing the cap.
+Every scope uses a 100% CPU quota and a repository-backed temporary directory. Java and the TLA+
+launcher receive the same repository-local temporary path.
 
 The command writes transient evidence below `target/verification`. Record commands, versions,
 result summaries, peak memory, and SHA-256 hashes in pgmcp before deleting those files.

@@ -18,6 +18,7 @@ contract.
 | Exhaustive oracle | `formal/model/exhaustive_graphs.rs` | Canonical forward/reverse CSR, every graph through four vertices, independent SCC oracle, all renamings, induced condensation/rank/flat-wave equivalence, adversarial enumerations, exact work and returned-buffer counters, and a small-stack deep graph |
 | Arithmetic refinement | `formal/verus/flat_wave_refinement.rs` | Rank-fiber partition laws, flat storage, exact schedule work, integer-domain safety, and the phase-complete uniform bound |
 | Production refinement | Rust tests and Kani harnesses | CSR validation, iterative Tarjan parity, stable ordering, malformed-input behavior, concrete overflow and fail-atomic checks, measured work/allocation bounds, recursion census, and small-stack lifecycle |
+| Dependency boundary | `scripts/check-core-boundary.sh` | Kernel metadata and sources contain no serialization dependency, feature, codec, schema, hash, or provenance implementation |
 
 The first three layers preceded production implementation. Verus and Kani connect the general
 resource contract and concrete Rust operations during refinement. Every layer is required for the
@@ -28,7 +29,7 @@ complete gate.
 The formal work reserves behaviors rather than premature Rust signatures:
 
 - canonical construction from stable vertices and directed edges;
-- non-panicking validation of public or deserialized CSR;
+- non-panicking validation of public or imported CSR;
 - deterministic forward and reverse adjacency;
 - strict-linear iterative SCC decomposition and explicit component lookup;
 - exact condensation construction and deterministic topological wavefronts; and
@@ -43,7 +44,7 @@ contract.
 An implementation release is admitted only when all answers are “yes.”
 
 1. Does construction preserve the extensional edge relation after sorting and duplicate removal?
-2. Does validation reject every malformed offset, endpoint, reverse-edge, and payload alignment?
+2. Does validation reject every malformed offset, endpoint, reverse-edge, and stable-node order?
 3. Does SCC output equal independent mutual-reachability classes?
 4. Does the quotient contain exactly the witnessed cross-component edges?
 5. Is the condensation acyclic and every reported wavefront dependency-valid?
@@ -52,10 +53,10 @@ An implementation release is admitted only when all answers are “yes.”
    the public operation applies?
 8. Are caps, cancellation, malformed input, and overflow explicit rather than reported as success?
 9. Do serial and future parallel paths produce the same canonical output?
-10. Do Rocq, TLC, the exhaustive oracle, Verus, Kani, Rust tests, strict lint, and documentation
-    lint all pass inside their resource scopes?
+10. Do the core-boundary check, Rocq, TLC, the exhaustive oracle, Verus, Kani, Rust tests, strict
+    lint, and documentation lint all pass inside their resource scopes?
 11. On canonical CSR, does SCC work equal $`5|V| + |E|`$ logical events and stay within
-    $`5|V|`$ auxiliary vertex slots, excluding returned output?
+    $`5|V| + |C| \le 6|V|`$ auxiliary logical entries, excluding returned output?
 12. Does phase-complete charging include safe workspace initialization, flat fiber
     materialization, paired condensation CSR construction, flat wave offsets and members, and
     exact radix work, with a bound at or below $`27|V| + 20|E| + 26{,}628`$?
