@@ -40,8 +40,9 @@ PraTTaIL, Replete, schedlib, and lling-llang without acquiring a serialization p
 ## End-to-end data path
 
 1. A caller constructs or imports a canonical `CsrGraph<DenseId>`.
-2. The interop encoder validates the graph and calculates the exact output size with checked
-   arithmetic.
+2. Safe `CsrGraph` construction establishes canonicality; the interop encoder consumes that type
+   invariant and calculates the exact output size with checked arithmetic without repeating the
+   kernel's linear validator.
 3. It emits the fixed 80-byte header, then forward offsets, then forward targets.
 4. Digesting streams the schema identity, semantic profile, snapshot length, and snapshot bytes
    through a fixed BLAKE3 derive-key context. It does not materialize a second preimage buffer.
