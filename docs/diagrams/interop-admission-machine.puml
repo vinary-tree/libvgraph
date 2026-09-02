@@ -1,0 +1,47 @@
+@startuml
+title Fail-closed snapshot admission and publication
+skinparam backgroundColor #F8FAFC
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam activity {
+  BackgroundColor #DBEAFE
+  BorderColor #1E3A5F
+  DiamondBackgroundColor #FEF3C7
+  DiamondBorderColor #92400E
+  StartColor #059669
+  EndColor #DC2626
+  BarColor #475569
+}
+
+start
+:Read fixed 80-byte header;
+if (magic, schema, version,\nflags, profile exact?) then (yes)
+  :Check vertex, edge, and byte limits\nwith overflow-safe arithmetic;
+  if (declared and actual lengths exact?) then (yes)
+    :Allocate exactly |V| + 1 + |E| u32 words;
+    :Parse offsets and targets with explicit cursors;
+    if (CSR origin, order, terminal,\nrange, uniqueness valid?) then (yes)
+      if (verified API?) then (yes)
+        :Stream schema, profile, length, and bytes\nthrough BLAKE3 derive-key mode;
+        if (expected digest matches?) then (yes)
+          :Publish CompleteExact snapshot;
+          stop
+        else (no)
+          :Return typed digest mismatch;
+        endif
+      else (no)
+        :Publish structurally validated snapshot;
+        stop
+      endif
+    else (no)
+      :Return typed canonicality failure;
+    endif
+  else (no)
+    :Return typed length failure;
+  endif
+else (no)
+  :Return typed identity or compatibility failure;
+endif
+:Release request-local buffers iteratively;
+stop
+@enduml

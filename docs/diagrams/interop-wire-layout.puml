@@ -1,0 +1,34 @@
+@startuml
+title libvgraph-interop v1.0 canonical snapshot wire layout
+skinparam backgroundColor #F8FAFC
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam rectangle {
+  BorderColor #1E3A5F
+  FontColor #0F172A
+  RoundCorner 8
+}
+
+rectangle "Header · 80 bytes" as snapshot_header #DBEAFE {
+  rectangle "0..7\nmagic\nLVGSNP 00 01" as magic #BFDBFE
+  rectangle "8..23\nschema identity\nLVGI-CSR-FWD-V1!" as schema #93C5FD
+  rectangle "24..27\nversion\nmajor u16 · minor u16" as version #60A5FA
+  rectangle "28..31\nflags u32\nmust be zero" as flags #3B82F6
+  rectangle "32..63\nsemantic profile\n32 opaque bytes" as profile #A7F3D0
+  rectangle "64..71\nvertex count u32\nedge count u32" as counts #6EE7B7
+  rectangle "72..79\npayload length u64" as length #34D399
+}
+
+rectangle "Payload · 4 × (|V| + 1 + |E|) bytes" as payload #FEF3C7 {
+  rectangle "offsets[0 .. |V|]\ncanonical u32 little-endian" as offsets #FDE68A
+  rectangle "targets[0 .. |E|)\nrow-sorted unique u32 little-endian" as targets #FBBF24
+}
+
+snapshot_header -down-> payload : exact contiguous bytes
+offsets -right-> targets : final offset = |E|
+
+note bottom of payload #FEE2E2
+No stable labels, reverse CSR, domain payloads,
+hashes, padding, trailing bytes, or unknown flags.
+end note
+@enduml

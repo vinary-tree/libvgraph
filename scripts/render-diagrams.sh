@@ -16,4 +16,7 @@ JAVA_TOOL_OPTIONS="$vinary_graph_java_options" plantuml -tsvg \
   "$repository_root/docs/diagrams/scc-quotient.puml" \
   "$repository_root/docs/diagrams/formal-first-flow.puml" \
   "$repository_root/docs/diagrams/linear-work-bound.puml" \
-  "$repository_root/docs/diagrams/dependency-wave-execution.puml"
+  "$repository_root/docs/diagrams/dependency-wave-execution.puml" \
+  "$repository_root/docs/diagrams/interop-wire-layout.puml" \
+  "$repository_root/docs/diagrams/interop-admission-machine.puml" \
+  "$repository_root/docs/diagrams/interop-boundaries.puml"
