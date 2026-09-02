@@ -9,15 +9,16 @@ ASSUME /\ Requests # {}
              "BadLength", "OverBudget", "BadIndex", "NonCanonical",
              "Trailing", "BadDigest"}
        /\ MaxWork = 5
-       /\ MaxHeap = 2
-       /\ Mutant \in {"None", "SkipSchema", "SkipCanonical", "IgnoreCancellation"}
+       /\ MaxHeap = 3
+       /\ Mutant \in {"None", "SkipSchema", "SkipCanonical", "IgnoreCancellation",
+                       "GrowNativeDepth"}
 
 Phases == {"Reading", "Admitted", "Published", "Rejected", "Released"}
 Results == {"None", "Exact", "Rejected"}
 
-VARIABLES phase, stage, inputKind, cancelled, work, heap, result
+VARIABLES phase, stage, inputKind, cancelled, work, heap, nativeDepth, result
 
-vars == <<phase, stage, inputKind, cancelled, work, heap, result>>
+vars == <<phase, stage, inputKind, cancelled, work, heap, nativeDepth, result>>
 
 FailureAt(kind, position) ==
   CASE position = 0 -> kind \in {"BadMagic", "BadSchema"}
@@ -42,6 +43,7 @@ Init ==
   /\ cancelled = [request \in Requests |-> FALSE]
   /\ work = [request \in Requests |-> 0]
   /\ heap = [request \in Requests |-> 0]
+  /\ nativeDepth = [request \in Requests |-> 1]
   /\ result = [request \in Requests |-> "None"]
 
 Read(request) ==
@@ -65,6 +67,9 @@ Read(request) ==
        /\ result' =
             [result EXCEPT ![request] =
               IF rejected THEN "Rejected" ELSE @]
+       /\ nativeDepth' =
+            [nativeDepth EXCEPT ![request] =
+              IF Mutant = "GrowNativeDepth" THEN @ + 1 ELSE @]
   /\ UNCHANGED <<inputKind, cancelled>>
 
 Cancel(request) ==
@@ -74,19 +79,19 @@ Cancel(request) ==
      THEN /\ UNCHANGED <<phase, result>>
      ELSE /\ phase' = [phase EXCEPT ![request] = "Rejected"]
           /\ result' = [result EXCEPT ![request] = "Rejected"]
-  /\ UNCHANGED <<stage, inputKind, work, heap>>
+  /\ UNCHANGED <<stage, inputKind, work, heap, nativeDepth>>
 
 Publish(request) ==
   /\ phase[request] = "Admitted"
   /\ IF Mutant = "IgnoreCancellation" THEN TRUE ELSE ~cancelled[request]
   /\ phase' = [phase EXCEPT ![request] = "Published"]
   /\ result' = [result EXCEPT ![request] = "Exact"]
-  /\ UNCHANGED <<stage, inputKind, cancelled, work, heap>>
+  /\ UNCHANGED <<stage, inputKind, cancelled, work, heap, nativeDepth>>
 
 Release(request) ==
   /\ phase[request] \in {"Published", "Rejected"}
   /\ phase' = [phase EXCEPT ![request] = "Released"]
-  /\ UNCHANGED <<stage, inputKind, cancelled, work, heap, result>>
+  /\ UNCHANGED <<stage, inputKind, cancelled, work, heap, nativeDepth, result>>
 
 Idle ==
   /\ \A request \in Requests: phase[request] = "Released"
@@ -106,6 +111,7 @@ TypeOK ==
   /\ cancelled \in [Requests -> BOOLEAN]
   /\ work \in [Requests -> 0..MaxWork]
   /\ heap \in [Requests -> 0..MaxHeap]
+  /\ nativeDepth \in [Requests -> 1..(MaxWork + 1)]
   /\ result \in [Requests -> Results]
 
 CursorBound ==
@@ -150,6 +156,6 @@ CancellationSticky ==
     cancelled[request] => phase[request] # "Reading"
 
 NativeControlDepthBound ==
-  \A request \in Requests: 1 = 1
+  \A request \in Requests: nativeDepth[request] = 1
 
 ====

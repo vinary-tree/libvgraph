@@ -39,8 +39,9 @@ canonicality checking, and cancellation enforcement; each produces a concrete
 
 The decoder reads the fixed header into scalars before allocating. It rejects counts above
 `SnapshotLimits`, checked-length overflow, a declared payload mismatch, an actual-length
-mismatch, and a host-address-space conversion failure. Only then may it allocate exactly
-`V + 1 + E` 32-bit words.
+mismatch, and a host-address-space conversion failure. Only then may it allocate the three flat
+buffers retained by the returned graph: `V` dense nodes, `V + 1` offsets, and `E` targets, totaling
+`2V + 1 + E` 32-bit words.
 
 Configured byte limits apply to the complete slice before digesting. This prevents an attacker
 from forcing unbounded BLAKE3 work merely by supplying a syntactically plausible header.
@@ -50,11 +51,12 @@ from forcing unbounded BLAKE3 work merely by supplying a syntactically plausible
 For a structurally valid candidate, decoder validation performs no more than:
 
 ```math
-W(V,E) = 8 + 2(V + 1) + 3E
+W(V,E) = 8 + 2(V + 1) + 2V + 3E = 10 + 4V + 3E
 ```
 
-logical operations in the formal cost model. Digest verification adds one linear streaming pass
-over the exact bytes. Both are $`O(V + E)`$.
+logical operations in the formal cost model. The additional `2V` term covers dense-node
+materialization and validation by the graph kernel. Digest verification adds one linear streaming
+pass over the exact bytes. Both are $`O(V + E)`$.
 
 All cursors, offsets, targets, errors, and BLAKE3 state are heap or fixed local values. Graph depth
 never adds a native call frame. The executable refinement exercises 100,000 vertices on a 64 KiB
@@ -96,7 +98,7 @@ the request cannot publish. A cancellation check belongs before expensive digest
 chunked long-running work when the API accepts a cancellation source, and immediately before
 publication.
 
-The initial synchronous codec does not spawn threads. This makes CPU, memory, and task budgets
+The synchronous codec does not spawn threads. This makes CPU, memory, and task budgets
 caller-governed and avoids nested executor oversubscription. Parallel request scheduling can use
 schedlib or another injected executor.
 

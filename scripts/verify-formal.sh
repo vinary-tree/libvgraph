@@ -66,8 +66,10 @@ verify_tla_interop() {
     InteropCodecSkipSchema.cfg
     InteropCodecSkipCanonical.cfg
     InteropCodecIgnoreCancellation.cfg
+    InteropCodecGrowNativeDepth.cfg
   )
-  local labels=(schema canonical cancellation)
+  local labels=(schema canonical cancellation native-depth)
+  local invariants=(PublicationSound PublicationSound PublicationSound NativeControlDepthBound)
   local index
   for index in "${!configurations[@]}"; do
     local log="$evidence_directory/interop-tlc-mutant-${labels[$index]}.log"
@@ -82,7 +84,7 @@ verify_tla_interop() {
         "${labels[$index]}" >&2
       return 1
     fi
-    rg -q 'Invariant PublicationSound is violated' "$log"
+    rg -q "Invariant ${invariants[$index]} is violated" "$log"
   done
 }
 
@@ -132,7 +134,7 @@ verify_smt_interop() {
 verify_invariants_interop() {
   "$repository_root/scripts/check-interop-invariants.sh" 2>&1 \
     | tee "$evidence_directory/interop-invariants.log"
-  rg -q '^verified 65 interop invariants ' \
+  rg -q '^verified 66 interop invariants ' \
     "$evidence_directory/interop-invariants.log"
 }
 

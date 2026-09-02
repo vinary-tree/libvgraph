@@ -13,7 +13,8 @@ acceptance interpretation.
 5. Schema, profile, payload, and digest-purpose changes produce distinct digest invocations.
 6. Every malformed identity, length, limit, offset, target, row, stale digest, or cancellation
    condition prevents exact publication.
-7. Encoder and decoder work, heap state, and native stack satisfy their stated bounds.
+7. Encoder and complete decoder work, all three returned graph buffers, and native stack satisfy
+   their stated bounds.
 8. Exact-version compatibility is deterministic and fail-closed.
 
 ## Evidence layers
@@ -72,15 +73,17 @@ Each mutant changes one cause:
 | `SkipSchema` | Schema mismatch rejection | Bad schema reaches exact publication |
 | `SkipCanonical` | Noncanonical CSR rejection | Noncanonical input reaches exact publication |
 | `IgnoreCancellation` | Sticky cancellation | Cancelled request reaches exact publication |
+| `GrowNativeDepth` | Flat, constant-depth control | A read step grows native control depth |
 
-A mutant is accepted as evidence only when TLC fails specifically on
-`PublicationSound`. A crash, syntax failure, or unrelated invariant failure does not
-count.
+A mutant is accepted as evidence only when TLC fails specifically on its intended invariant:
+`PublicationSound` for the three publication mutants and `NativeControlDepthBound` for
+`GrowNativeDepth`. A crash, syntax failure, or unrelated invariant failure does not count.
 
 ## Deep-stack experiment
 
-The standalone model constructs a 100,000-vertex directed chain, encodes it, decodes it, compares
-it, and destroys all owned values on a thread configured with a 64 KiB native stack. The
+The standalone model constructs a 100,000-vertex directed chain, encodes it, decodes it,
+materializes and compares the dense-node vector, compares the snapshot, and destroys all owned
+values on a thread configured with a 64 KiB native stack. The
 experiment is designed to exercise graph-depth-sensitive lifecycle operations, not merely the
 main parsing loop. Its purpose is to refute hidden recursive construction, comparison, error, or
 drop paths.

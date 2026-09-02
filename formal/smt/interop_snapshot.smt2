@@ -18,21 +18,21 @@
 (check-sat)
 (pop)
 
-; The returned forward-CSR allocation uses exactly V + 1 + E words.
+; The returned graph owns V dense nodes, V + 1 offsets, and E targets.
 (push)
 (assert (and (<= 0 vertices) (<= vertices U32_MAX)
              (<= 0 edges) (<= edges U32_MAX)))
-(define-fun heap_words () Int (+ vertices 1 edges))
-(assert (not (= heap_words (+ vertices 1 edges))))
+(define-fun heap_words () Int (+ (* 2 vertices) 1 edges))
+(assert (not (= heap_words (+ (* 2 vertices) 1 edges))))
 (check-sat)
 (pop)
 
-; The validation pass is bounded by 8 + 2(V + 1) + 3E work units.
+; Complete structural decoding is bounded by 8 + 2(V + 1) + 2V + 3E units.
 (push)
 (assert (and (<= 0 vertices) (<= 0 edges)))
 (declare-const actual_work Int)
-(assert (<= actual_work (+ 8 (* 2 (+ vertices 1)) (* 3 edges))))
-(assert (> actual_work (+ 8 (* 2 (+ vertices 1)) (* 3 edges))))
+(assert (<= actual_work (+ 8 (* 2 (+ vertices 1)) (* 2 vertices) (* 3 edges))))
+(assert (> actual_work (+ 8 (* 2 (+ vertices 1)) (* 2 vertices) (* 3 edges))))
 (check-sat)
 (pop)
 

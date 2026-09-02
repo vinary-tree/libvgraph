@@ -69,7 +69,7 @@ The pseudocode is literate: each statement corresponds to one admission or layou
 
 ```text
 ENCODE(graph, profile):
-    require graph.validate() succeeds
+    require graph was created by a safe CsrGraph constructor
     V ← checked_u32(graph.vertex_count)
     E ← checked_u32(graph.edge_count)
     payload_length ← checked_u64(4 × (V + 1 + E))
@@ -104,10 +104,9 @@ DECODE(bytes, expected_profile, limits):
     reject arithmetic or address-space overflow
     reject a declared payload length not equal to 4 × (V + 1 + E)
     reject truncated or trailing bytes
-    allocate exactly V + 1 offsets and E targets
+    allocate exactly V dense nodes, V + 1 offsets, and E targets
     parse each u32 with a monotonically increasing cursor
-    validate offset origin, order, and terminal
-    validate target range and strict order within every row
+    validate dense-node order, offset origin/order/terminal, target range, and row order
     publish the canonical forward graph
 ```
 

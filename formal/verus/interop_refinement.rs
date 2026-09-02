@@ -7,11 +7,11 @@ pub open spec fn wire_bytes(vertices: nat, edges: nat) -> nat {
 }
 
 pub open spec fn decoder_heap_words(vertices: nat, edges: nat) -> nat {
-    vertices + 1 + edges
+    2 * vertices + 1 + edges
 }
 
 pub open spec fn decoder_work_bound(vertices: nat, edges: nat) -> nat {
-    8 + 2 * (vertices + 1) + 3 * edges
+    8 + 2 * (vertices + 1) + 2 * vertices + 3 * edges
 }
 
 pub open spec fn admitted(
@@ -83,7 +83,7 @@ proof fn decoder_cursor_step_is_bounded(cursor: nat, length: nat)
 proof fn validation_work_is_linear(vertices: nat, edges: nat)
     ensures
         decoder_work_bound(vertices, edges)
-            == 10 + 2 * vertices + 3 * edges,
+            == 10 + 4 * vertices + 3 * edges,
 {
 }
 

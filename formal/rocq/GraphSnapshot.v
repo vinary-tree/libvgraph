@@ -261,11 +261,12 @@ Definition within_limitsb
    Nat.leb (wire_bytes snapshot) limits.(maximum_bytes)).
 
 Definition decoder_heap_words (snapshot : graph_snapshot) : nat :=
-  S snapshot.(snapshot_vertices) +
+  2 * snapshot.(snapshot_vertices) + 1 +
   length snapshot.(snapshot_targets).
 
 Definition decoder_work_upper_bound (snapshot : graph_snapshot) : nat :=
   8 + 2 * S snapshot.(snapshot_vertices) +
+  2 * snapshot.(snapshot_vertices) +
   3 * length snapshot.(snapshot_targets).
 
 Theorem admitted_snapshot_respects_vertex_limit :
@@ -306,7 +307,7 @@ Qed.
 Theorem decoder_heap_is_linear :
   forall snapshot,
     decoder_heap_words snapshot =
-      S snapshot.(snapshot_vertices) +
+      2 * snapshot.(snapshot_vertices) + 1 +
       length snapshot.(snapshot_targets).
 Proof.
   reflexivity.
@@ -315,7 +316,7 @@ Qed.
 Theorem decoder_work_is_linear :
   forall snapshot,
     decoder_work_upper_bound snapshot =
-      10 + 2 * snapshot.(snapshot_vertices) +
+      10 + 4 * snapshot.(snapshot_vertices) +
       3 * length snapshot.(snapshot_targets).
 Proof.
   intros snapshot.

@@ -72,6 +72,7 @@ enum DecodeError {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct DecodeReport {
     snapshot: Snapshot,
+    dense_nodes: Vec<u32>,
     work: u64,
     heap_words: u64,
 }
@@ -82,11 +83,7 @@ struct DigestInvocation {
     material: Vec<u8>,
 }
 
-fn canonical_snapshot(
-    vertices: u32,
-    raw_edges: &[(u32, u32)],
-    profile: [u8; 32],
-) -> Snapshot {
+fn canonical_snapshot(vertices: u32, raw_edges: &[(u32, u32)], profile: [u8; 32]) -> Snapshot {
     let mut edges = raw_edges.to_vec();
     assert!(
         edges
@@ -235,10 +232,10 @@ fn decode(
         return Err(DecodeError::Trailing);
     }
 
-    let offset_count = usize::try_from(u64::from(vertices) + 1)
-        .map_err(|_| DecodeError::LengthOverflow)?;
+    let offset_count =
+        usize::try_from(u64::from(vertices) + 1).map_err(|_| DecodeError::LengthOverflow)?;
     let target_count = usize::try_from(edges).map_err(|_| DecodeError::LengthOverflow)?;
-    let heap_words = u64::from(vertices) + 1 + u64::from(edges);
+    let heap_words = 2 * u64::from(vertices) + 1 + u64::from(edges);
     let mut offsets = Vec::with_capacity(offset_count);
     let mut targets = Vec::with_capacity(target_count);
     let mut cursor = HEADER_BYTES;
@@ -256,6 +253,16 @@ fn decode(
     }
     assert_eq!(cursor, bytes.len());
 
+    let dense_nodes: Vec<u32> = (0..vertices).collect();
+    work += u64::from(vertices);
+    for pair in dense_nodes.windows(2) {
+        work += 1;
+        assert!(pair[0] < pair[1], "constructed dense nodes must be ordered");
+    }
+    if !dense_nodes.is_empty() {
+        work += 1;
+    }
+
     let snapshot = Snapshot {
         vertices,
         offsets,
@@ -263,13 +270,14 @@ fn decode(
         profile: expected_profile,
     };
     work += validate_snapshot_with_work(&snapshot)?;
-    let bound = 8 + 2 * (u64::from(vertices) + 1) + 3 * u64::from(edges);
+    let bound = 8 + 2 * (u64::from(vertices) + 1) + 2 * u64::from(vertices) + 3 * u64::from(edges);
     assert!(
         work <= bound,
         "decoder work {work} must remain below the proven {bound} bound"
     );
     Ok(DecodeReport {
         snapshot,
+        dense_nodes,
         work,
         heap_words,
     })
@@ -382,12 +390,7 @@ fn renamed_edges(snapshot: &Snapshot, permutation: &[u32]) -> Vec<(u32, u32)> {
     let mut edges: Vec<_> = snapshot
         .edges()
         .into_iter()
-        .map(|(source, target)| {
-            (
-                permutation[source as usize],
-                permutation[target as usize],
-            )
-        })
+        .map(|(source, target)| (permutation[source as usize], permutation[target as usize]))
         .collect();
     edges.sort_unstable();
     edges
@@ -429,11 +432,7 @@ fn assert_malformed_rejections() {
     let bytes = encode(&base);
 
     for prefix_length in 0..bytes.len() {
-        let result = decode(
-            &bytes[..prefix_length],
-            profile,
-            Limits::UNBOUNDED_MODEL,
-        );
+        let result = decode(&bytes[..prefix_length], profile, Limits::UNBOUNDED_MODEL);
         assert!(result.is_err(), "every strict prefix must be rejected");
     }
 
@@ -533,24 +532,21 @@ fn assert_malformed_rejections() {
     );
 
     let mut mutated = bytes.clone();
-    mutated[HEADER_BYTES + 8..HEADER_BYTES + 12]
-        .copy_from_slice(&0_u32.to_le_bytes());
+    mutated[HEADER_BYTES + 8..HEADER_BYTES + 12].copy_from_slice(&0_u32.to_le_bytes());
     assert_eq!(
         decode(&mutated, profile, Limits::UNBOUNDED_MODEL),
         Err(DecodeError::OffsetOrder)
     );
 
     let mut mutated = bytes.clone();
-    mutated[HEADER_BYTES + 8..HEADER_BYTES + 12]
-        .copy_from_slice(&2_u32.to_le_bytes());
+    mutated[HEADER_BYTES + 8..HEADER_BYTES + 12].copy_from_slice(&2_u32.to_le_bytes());
     assert_eq!(
         decode(&mutated, profile, Limits::UNBOUNDED_MODEL),
         Err(DecodeError::OffsetTerminal)
     );
 
     let mut mutated = bytes.clone();
-    mutated[HEADER_BYTES + 12..HEADER_BYTES + 16]
-        .copy_from_slice(&2_u32.to_le_bytes());
+    mutated[HEADER_BYTES + 12..HEADER_BYTES + 16].copy_from_slice(&2_u32.to_le_bytes());
     assert_eq!(
         decode(&mutated, profile, Limits::UNBOUNDED_MODEL),
         Err(DecodeError::TargetOutOfRange)
@@ -582,14 +578,10 @@ fn assert_digest_domains() {
 
     let mut other_payload = bytes;
     other_payload[HEADER_BYTES] ^= 1;
-    assert_ne!(
-        base,
-        digest_invocation(SCHEMA_ID, profile, &other_payload)
-    );
+    assert_ne!(base, digest_invocation(SCHEMA_ID, profile, &other_payload));
 
     let mut other_context = base.clone();
-    other_context.context =
-        "libvgraph-interop 2026-09-02 17:22:31 UTC different digest purpose";
+    other_context.context = "libvgraph-interop 2026-09-02 17:22:31 UTC different digest purpose";
     assert_ne!(base, other_context);
 }
 
@@ -609,13 +601,15 @@ fn assert_deep_small_stack() {
             let report = decode(&bytes, profile, Limits::UNBOUNDED_MODEL)
                 .expect("a deep canonical snapshot must decode");
             assert_eq!(report.snapshot, snapshot);
+            assert_eq!(report.dense_nodes, (0..VERTICES).collect::<Vec<_>>());
             assert_eq!(
                 report.heap_words,
-                u64::from(VERTICES) + u64::try_from(edges.len()).expect("edge count fits") + 1
+                2 * u64::from(VERTICES) + u64::try_from(edges.len()).expect("edge count fits") + 1
             );
             assert!(
                 report.work
                     <= 8 + 2 * (u64::from(VERTICES) + 1)
+                        + 2 * u64::from(VERTICES)
                         + 3 * u64::try_from(edges.len()).expect("edge count fits")
             );
         })
@@ -647,9 +641,10 @@ fn main() {
                 let report = decode(&bytes, profile, Limits::UNBOUNDED_MODEL)
                     .expect("canonical exhaustive snapshot must decode");
                 assert_eq!(report.snapshot, snapshot);
+                assert_eq!(report.dense_nodes, (0..vertices).collect::<Vec<_>>());
                 assert_eq!(
                     report.heap_words,
-                    u64::from(vertices) + 1 + snapshot.targets.len() as u64
+                    2 * u64::from(vertices) + 1 + snapshot.targets.len() as u64
                 );
 
                 if let Some(previous) = unique_encodings.insert(bytes.clone(), snapshot.clone()) {
@@ -677,21 +672,18 @@ fn main() {
                         profile,
                     );
                     let renamed_bytes = encode(&renamed);
-                    let renamed_report =
-                        decode(&renamed_bytes, profile, Limits::UNBOUNDED_MODEL)
-                            .expect("a lawfully renamed snapshot must decode");
-                    assert_eq!(renamed_report.snapshot.edges(), renamed_edges(&snapshot, &permutation));
+                    let renamed_report = decode(&renamed_bytes, profile, Limits::UNBOUNDED_MODEL)
+                        .expect("a lawfully renamed snapshot must decode");
+                    assert_eq!(
+                        renamed_report.snapshot.edges(),
+                        renamed_edges(&snapshot, &permutation)
+                    );
                     renaming_count += 1;
                 }
 
                 for prefix_length in 0..bytes.len() {
                     assert!(
-                        decode(
-                            &bytes[..prefix_length],
-                            profile,
-                            Limits::UNBOUNDED_MODEL
-                        )
-                        .is_err()
+                        decode(&bytes[..prefix_length], profile, Limits::UNBOUNDED_MODEL).is_err()
                     );
                     truncation_count += 1;
                 }

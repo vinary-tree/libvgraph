@@ -33,7 +33,7 @@ The formal artifacts precede production implementation.
   payload-free kernel has no serialization dependency or feature. Portable encoding, schema
   identity, hashing, and provenance belong to `libvgraph-interop`.
 - `rocq/GraphSnapshot.v` proves the flat word-tape round trip, uniqueness, exact schema
-  and profile rejection, admission limits, linear heap/work equations, explicit cursor progress,
+  and profile rejection, complete three-buffer heap/work equations, explicit cursor progress,
   constant native control depth, and tagged digest-preimage separation. Nineteen acceptance
   theorems must report a closed global context.
 - `tla/InteropCodecMachine.tla` checks two concurrent requests across eleven input
@@ -42,10 +42,10 @@ The formal artifacts precede production implementation.
   canonicality, or cancellation enforcement is removed.
 - `smt/interop_snapshot.smt2` proves nine unsatisfiable overflow, bound, separation, and
   fail-closed obligations and produces two constructive satisfiable models.
-- `model/exhaustive_interop.rs` refines the exact 80-byte header and little-endian
-  payload over all 531 graphs through three vertices, 1,593 profile encodings, 9,321 lawful
-  renamings, 180,696 strict prefixes, two golden vectors, targeted corruptions, and a
-  100,000-vertex 64 KiB-stack lifecycle.
+- `model/exhaustive_interop.rs` refines the exact 80-byte header, little-endian payload, returned
+  dense-node vector, and complete work/heap bounds over all 531 graphs through three vertices,
+  1,593 profile encodings, 9,321 lawful renamings, 180,696 strict prefixes, two golden vectors,
+  targeted corruptions, and a 100,000-vertex 64 KiB-stack lifecycle.
 - `verus/interop_refinement.rs` proves six Rust-shaped arithmetic, admission, cursor,
   and work refinements. `doc/interop-invariants.tsv` maps 65 obligations bijectively onto
   thirteen required-red production properties.
@@ -62,7 +62,7 @@ Run only the snapshot/digest contract:
 scripts/verify-formal.sh interop
 ```
 
-The interop target succeeds only when all positive layers pass, all three causal mutants fail on
+The interop target succeeds only when all positive layers pass, all four causal mutants fail on
 their intended invariant, and the required-red suite fails solely at the unresolved
 `libvgraph_interop` import.
 

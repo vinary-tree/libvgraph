@@ -8,8 +8,8 @@ INT-006	Semantic profile mismatch is rejected	Rocq	formal/rocq/GraphSnapshot.v	s
 INT-007	Admitted vertices respect their limit	Rocq	formal/rocq/GraphSnapshot.v	admitted_snapshot_respects_vertex_limit	contract_resource_limits_fail_before_publication
 INT-008	Admitted edges respect their limit	Rocq	formal/rocq/GraphSnapshot.v	admitted_snapshot_respects_edge_limit	contract_resource_limits_fail_before_publication
 INT-009	Admitted bytes respect their limit	Rocq	formal/rocq/GraphSnapshot.v	admitted_snapshot_respects_byte_limit	contract_resource_limits_fail_before_publication
-INT-010	Decoder heap words are linear	Rocq	formal/rocq/GraphSnapshot.v	decoder_heap_is_linear	contract_deep_codec_lifecycle_is_native_stack_independent
-INT-011	Decoder validation work is linear	Rocq	formal/rocq/GraphSnapshot.v	decoder_work_is_linear	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-010	Complete returned graph heap words are linear	Rocq	formal/rocq/GraphSnapshot.v	decoder_heap_is_linear	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-011	Complete decode including dense nodes and validation is linear	Rocq	formal/rocq/GraphSnapshot.v	decoder_work_is_linear	contract_deep_codec_lifecycle_is_native_stack_independent
 INT-012	Every tape step advances one word	Rocq	formal/rocq/GraphSnapshot.v	decoder_step_progresses	contract_deep_codec_lifecycle_is_native_stack_independent
 INT-013	Tape steps preserve cursor validity	Rocq	formal/rocq/GraphSnapshot.v	decoder_step_preserves_validity	contract_length_index_and_trailing_rejection
 INT-014	Native control depth is constant	Rocq	formal/rocq/GraphSnapshot.v	decoder_native_stack_is_constant	contract_deep_codec_lifecycle_is_native_stack_independent
@@ -32,8 +32,8 @@ INT-030	Schema-check removal causes publication failure	TLC	formal/tla/InteropCo
 INT-031	Canonical-check removal causes publication failure	TLC	formal/tla/InteropCodecMachine.tla	SkipCanonical	contract_length_index_and_trailing_rejection
 INT-032	Cancellation-check removal causes publication failure	TLC	formal/tla/InteropCodecMachine.tla	IgnoreCancellation	contract_stale_digest_rejection
 INT-033	Maximum v1 byte length fits u64	Z3	formal/smt/interop_snapshot.smt2	wire_length	contract_resource_limits_fail_before_publication
-INT-034	Returned forward CSR uses exact heap words	Z3	formal/smt/interop_snapshot.smt2	heap_words	contract_deep_codec_lifecycle_is_native_stack_independent
-INT-035	Validation cannot exceed its linear charge	Z3	formal/smt/interop_snapshot.smt2	actual_work	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-034	Returned graph uses exact dense-node offset and target words	Z3	formal/smt/interop_snapshot.smt2	heap_words	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-035	Complete decode cannot exceed its linear charge	Z3	formal/smt/interop_snapshot.smt2	actual_work	contract_deep_codec_lifecycle_is_native_stack_independent
 INT-036	Digest domain is constructor-separated	Z3	formal/smt/interop_snapshot.smt2	preimage-domain	contract_digest_domain_schema_and_payload_separation
 INT-037	Digest schema is constructor-separated	Z3	formal/smt/interop_snapshot.smt2	preimage-schema	contract_digest_domain_schema_and_payload_separation
 INT-038	Digest profile is constructor-separated	Z3	formal/smt/interop_snapshot.smt2	preimage-profile	contract_profile_separation
@@ -64,3 +64,4 @@ INT-062	Every encoding includes a complete header	Verus	formal/verus/interop_ref
 INT-063	Stale digest never publishes required red	RequiredRed	tests/interop_contract_properties.rs	contract_stale_digest_rejection	contract_stale_digest_rejection
 INT-064	Exact version policy is executable required red	RequiredRed	tests/interop_contract_properties.rs	contract_exact_cross_version_policy	contract_exact_cross_version_policy
 INT-065	No unmodeled snapshot API is silently accepted	RequiredRed	tests/interop_contract_properties.rs	libvgraph_interop	contract_schema_rejection
+INT-066	Native-depth growth causes the control-depth invariant to fail	TLC	formal/tla/InteropCodecMachine.tla	GrowNativeDepth	contract_deep_codec_lifecycle_is_native_stack_independent

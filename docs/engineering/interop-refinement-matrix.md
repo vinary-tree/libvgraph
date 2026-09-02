@@ -35,14 +35,21 @@ allocates the exact output length:
 B(V,E) = 80 + 4(V + 1 + E).
 ```
 
-The structural decoder allocates exactly `V + 1 + E` 32-bit words for its returned
-forward CSR. Its checked validation charge is bounded by:
+The structural decoder's returned graph owns exactly `V` dense-node words, `V + 1` forward-offset
+words, and `E` forward-target words:
 
 ```math
-W(V,E) = 8 + 2(V + 1) + 3E.
+H(V,E) = 2V + 1 + E.
 ```
 
-These equations exclude the returned Rust object header and allocator bookkeeping, which are
+Its checked complete structural charge, including dense-node materialization and the core
+canonical validator, is bounded by:
+
+```math
+W(V,E) = 8 + 2(V + 1) + 2V + 3E = 10 + 4V + 3E.
+```
+
+These equations exclude only the returned Rust object header and allocator bookkeeping, which are
 constant with respect to graph size. Verified digesting adds one byte-linear BLAKE3 pass and
 constant hasher state. No representation requires reverse CSR or a second payload copy.
 
@@ -50,6 +57,8 @@ constant hasher state. No representation requires reverse CSR or a second payloa
 
 - Header fields are read into fixed scalars and fixed arrays.
 - Offsets and targets use two preallocated contiguous `Vec<u32>` buffers.
+- Dense nodes use one preallocated contiguous `Vec<DenseId>` buffer whose elements have the same
+  32-bit representation size.
 - Dense targets convert to `DenseId` without maps or per-edge allocation.
 - The encoder writes directly into one exactly preallocated `Vec<u8>`.
 - Digest updates borrow the caller's snapshot slice; they do not build the conceptual preimage.

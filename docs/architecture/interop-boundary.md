@@ -47,7 +47,8 @@ PraTTaIL, Replete, schedlib, and lling-llang without acquiring a serialization p
 4. Digesting streams the schema identity, semantic profile, snapshot length, and snapshot bytes
    through a fixed BLAKE3 derive-key context. It does not materialize a second preimage buffer.
 5. A structural decoder validates header identity and limits before allocating.
-6. The decoder parses and validates the complete canonical CSR using explicit cursors.
+6. The decoder parses the canonical CSR, materializes dense nodes, and validates the complete
+   returned graph using explicit cursors and flat buffers.
 7. A verified decoder additionally compares the expected digest before publishing an exact graph.
 8. Rejection releases request-local buffers without publishing a partial graph.
 
@@ -134,9 +135,9 @@ Input edge enumeration is different: permutation and duplication of raw edges ar
 
 Independent requests share no mutable codec state and require no global lock. Each request owns
 its cursor, output or decoded vectors, work counters, limits, and cancellation observation. This
-permits caller-directed parallel execution. Parallelizing the individual word loop is not part of
-the initial contract because ordered sequential writes and linear validation are bandwidth-bound
-and avoid synchronization. Parallelism belongs at the request level unless measurement proves a
+permits caller-directed parallel execution. The individual word loop remains sequential because
+ordered writes and linear validation are bandwidth-bound and avoid synchronization. Parallelism
+belongs at the request level unless measurement proves a
 larger single-snapshot strategy beneficial without changing byte order or failure precedence.
 
 ## Rejected alternatives
