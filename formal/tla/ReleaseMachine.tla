@@ -83,7 +83,7 @@ CreateDraft ==
                   registryHash, published, publicationCount>>
 
 AttachAssets ==
-  /\ phase = "Draft"
+  /\ phase = "RegistryVerified"
   /\ phase' = "AssetsAttached"
   /\ packageHash' = "CandidateArtifact"
   /\ assetHash' = "CandidateArtifact"
@@ -92,7 +92,7 @@ AttachAssets ==
                   publicationCount>>
 
 VerifyRegistry ==
-  /\ phase = "AssetsAttached"
+  /\ phase = "Draft"
   /\ registryHash' =
        IF registryState = "Mismatched"
        THEN "OtherArtifact"
@@ -105,7 +105,7 @@ VerifyRegistry ==
                   evidenceComplete, published, publicationCount>>
 
 Publish ==
-  /\ phase = "RegistryVerified"
+  /\ phase = "AssetsAttached"
   /\ phase' = "Published"
   /\ published' = TRUE
   /\ publicationCount' = publicationCount + 1

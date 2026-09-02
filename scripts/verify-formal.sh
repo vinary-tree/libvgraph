@@ -98,7 +98,7 @@ verify_tla_release() {
     | tee "$evidence_directory/release-tlc-positive.log"
   rg -q 'Model checking completed. No error has been found' \
     "$evidence_directory/release-tlc-positive.log"
-  rg -q '178 states generated, 130 distinct states found' \
+  rg -q '176 states generated, 128 distinct states found' \
     "$evidence_directory/release-tlc-positive.log"
 
   local configurations=(
@@ -187,7 +187,7 @@ verify_smt_interop() {
 verify_invariants_interop() {
   "$repository_root/scripts/check-interop-invariants.sh" 2>&1 \
     | tee "$evidence_directory/interop-invariants.log"
-  rg -q '^verified 66 interop invariants ' \
+  rg -q '^verified 74 interop and release invariants ' \
     "$evidence_directory/interop-invariants.log"
 }
 

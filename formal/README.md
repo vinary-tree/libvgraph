@@ -44,9 +44,9 @@ The formal artifacts precede production implementation.
   grown per read step.
 - `tla/ReleaseMachine.tla` checks the external publication boundary over every Boolean trust/gate
   combination and absent, matching, and mismatched registry states. The positive model generates
-  178 states, reaches 130 distinct states at depth 7, and requires protected signer policy,
-  identity with protected default-branch head, successful gates, draft-before-assets ordering,
-  complete evidence, equal package/registry hashes, and at most one publication. Seven causal
+  176 states, reaches 128 distinct states at depth 7, and requires protected signer policy,
+  identity with protected default-branch head, successful gates, a draft containing complete
+  evidence after registry verification, equal package/registry hashes, and at most one publication. Seven causal
   configurations each remove exactly one control and must violate its targeted invariant.
 - `smt/interop_snapshot.smt2` proves nine unsatisfiable overflow, bound, separation, and
   fail-closed obligations and produces two constructive satisfiable models.
