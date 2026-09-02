@@ -1,0 +1,39 @@
+@startuml
+skinparam backgroundColor #F8FAFC
+skinparam defaultFontName DejaVu Sans
+skinparam shadowing false
+skinparam ArrowColor #334155
+skinparam ArrowThickness 2
+skinparam rectangle {
+  BorderColor #334155
+  FontColor #0F172A
+}
+
+title Why witness selection needs a transported order
+
+rectangle "Source SCC <latex>S</latex>\nvertices 0 and 1" as source #DBEAFE
+rectangle "Target SCC <latex>T</latex>\nvertices 2 and 3" as target #A7F3D0
+rectangle "Witness fiber\n<latex>F(S,T)=\{e_0,e_1\}</latex>" as fiber #C4B5FD
+rectangle "Automorphism <latex>\sigma</latex>\n0 ↔ 1 and 2 ↔ 3\n<latex>\sigma(e_0)=e_1</latex>" as symmetry #FDE68A
+rectangle "Unqualified selector\n<latex>s(F)=e_0</latex>" as bad #FECACA
+rectangle "Transported-order selector\n<latex>s_{\prec}(F)=\min_{\prec}F</latex>" as good #FBCFE8
+
+source -[#2563EB,bold]-> target : <latex>e_0:0\to2</latex>
+source -[#2563EB,bold]-> target : <latex>e_1:1\to3</latex>
+source -[#7C3AED,dashed]-> fiber : quotient mapping
+target -[#7C3AED,dashed]-> fiber
+fiber -[#D97706,bold]-> symmetry : lawful renaming
+symmetry -[#DC2626,bold]-> bad : <latex>\sigma(s(F))\neq s(\sigma F)</latex>
+symmetry -[#DB2777,bold]-> good : transport <latex>\prec</latex> with <latex>\sigma</latex>
+
+note bottom of bad #FEE2E2
+  The unchanged graph has two symmetric witnesses.
+  Choosing one by its local CSR index breaks naturality.
+end note
+
+note bottom of good #FCE7F3
+  Witness validity and the complete fiber are natural
+  without a policy. A single choice is natural only
+  in the category whose objects include the order.
+end note
+@enduml

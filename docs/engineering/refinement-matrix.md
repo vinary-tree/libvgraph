@@ -28,6 +28,16 @@ tests alone is insufficient unless those tests exercise the mapped obligation be
 | Neutral core boundary | Cargo metadata and source checks prove that serialization, hashing, schema identity, and provenance remain outside the kernel |
 | Concrete arithmetic safety | Kani proves pair encoding, radix charge arithmetic, fail-atomic work admission, and bounded production flat-wave materialization |
 | General arithmetic refinement | Verus proves flat storage and schedule/pipeline work bounds for arbitrary natural-number parameters satisfying the graph inequalities |
+| Provenance sidecar shape | Exact edge-count-plus-one offsets, zero origin, monotone offsets, exact terminal, and sorted duplicate-free fiber tests |
+| Provenance union laws | Associativity, commutativity, idempotence, identity, deterministic bytes, and output-size/work bounds |
+| Path replay | Out-of-range, wrong-source, truncated, empty, valid, composed, and transported edge-index paths |
+| Reachability witness | BFS result and shortest length agree with independent closure/distance on every bounded rooted graph |
+| Condensation witness fibers | Every cross-component source edge occurs in exactly one quotient-edge fiber and all fibers transport under renaming |
+| Representative claim boundary | Automorphism negative control rejects an unqualified selector; transported-order property proves the qualified selector |
+| Dominator tree | Iterative Lengauer–Tarjan agrees with vertex-removal dominance and immediate-dominator laws |
+| Dominance frontiers | Local/up output agrees with the predecessor definition, including loop self-membership |
+| Witness outcome separation | Invalid, unreachable, exhausted, and cancelled results cannot be exact |
+| Witness stack safety | Search, replay, iterative DFS, link-eval, dominator-tree/frontier traversal, sidecar construction/union, and drop pass on a 256 KiB thread |
 
 ## Malformed-representation matrix
 
@@ -35,6 +45,9 @@ The validator must cover empty offsets, wrong offset length, nonzero first offse
 offsets, a terminal offset beyond or before the target count, out-of-range targets, unsorted or
 duplicate adjacency entries, mismatched reverse edges, stable-node ordering failures, and integer
 conversion overflow. Each case must return a stable structured error before indexed traversal.
+The witness validator additionally covers wrong sidecar offset count/origin/terminal, decreasing
+sidecar offsets, unsorted or duplicate provenance fibers, invalid path indices, wrong current-row
+ownership, and mismatched path targets.
 
 ## Deterministic concurrency condition
 
@@ -51,6 +64,10 @@ canonicalization is linear in the word-RAM model, and rank/wave construction is 
 condensation size. Arbitrary `Ord` stable labels use a separately exposed comparison-model path;
 its ordering lower bound is not charged to dense graph analysis. Existing libcpg algorithm-choice
 evidence is reused. Only new or materially refactored paths receive new performance experiments.
+Rooted dominators use iterative Lengauer–Tarjan with iterative link-eval path compression; the
+definition-level removal oracle is bounded-test evidence only. Dominance frontiers use the
+output-sensitive dominator-tree local/up construction. A slower fixed-point dominator
+implementation is not admitted to the production hot path.
 
 ## Evidence handling
 

@@ -22,9 +22,26 @@ The formal artifacts precede production implementation.
   closure, checks every vertex permutation together with its induced condensation and ranks, and
   constructs flat wave offsets/members with exact work and constant-buffer checks, and runs a
   20,000-vertex small-stack lifecycle.
+- `rocq/GraphWitnesses.v` specifies opaque provenance fibers, canonical union, edge-index replay,
+  reachability, condensation source-edge fibers, rooted dominance, dominance frontiers,
+  transported-order selection, incomplete outcomes, and logical resource bounds. It proves the
+  two-witness counterexample which forbids an unqualified natural selector, then proves
+  uniqueness and naturality when a strict total-order policy is transported with the witness
+  fiber. Every printed acceptance theorem must be closed under the global context.
+- `tla/WitnessMachine.tla` models canonical search, iterative parent reconstruction, replay,
+  budgets, cancellation, invalid parent state, and exact/unreachable terminal separation.
+  `WitnessMachine.cfg` and `WitnessMachineUnreachable.cfg` check reachable and unreachable goals.
+- `model/exhaustive_witnesses.rs` enumerates 530 directed graphs, 1,570 rooted
+  dominator/frontier cases, and 3,106 lawful renamings. It compares iterative
+  Lengauer–Tarjan with a vertex-removal dominance oracle, compares local/up frontiers with their
+  predecessor definition, executes every registered mutant/malformed case, and runs the complete
+  witness stack on a 20,000-vertex chain in a 256 KiB native-stack thread.
 - `verus/flat_wave_refinement.rs` proves rank-fiber totality and disjointness, flat-wave storage
   linearity, exact schedule charging, unsigned 64-bit fit in the graph domain, and the uniform
   phase-complete pipeline bound.
+- `verus/witness_refinement.rs` proves flat sidecar storage, union/reachability/frontier charges,
+  exact path-replay work, constant replay auxiliary state, near-linear dominator charging,
+  unsigned 64-bit graph-domain fit, and constant native-control depth.
 - The `#[cfg(kani)]` harnesses in `src/radix.rs`, `src/control.rs`, and `src/condensation.rs`
   execute concrete production functions symbolically. They prove pair encoding round trips,
   radix-work arithmetic cannot overflow in the graph domain, work admission is fail-atomic, and
@@ -39,7 +56,14 @@ Run:
 scripts/verify-formal.sh
 ```
 
-The default command checks all six layers. Each layer runs in a transient systemd user scope with
+Run only the new pre-implementation witness layers:
+
+```bash
+scripts/verify-formal.sh witness
+```
+
+The default command checks the complete core and witness layers. Each layer runs in a transient
+systemd user scope with
 `MemorySwapMax=0`, one Cargo build job, and an explicit resident-memory ceiling. Rocq, TLA+/TLC,
 the exhaustive model, and Verus receive 4 GiB; Kani/CBMC receives 2 GiB. A cap hit is a failed
 proof gate and must be addressed by reducing verifier state, not by silently increasing the cap.

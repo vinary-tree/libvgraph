@@ -1,0 +1,41 @@
+@startuml
+skinparam backgroundColor #F8FAFC
+skinparam defaultFontName DejaVu Sans
+skinparam shadowing false
+skinparam ArrowColor #334155
+skinparam ArrowThickness 2
+skinparam rectangle {
+  BorderColor #334155
+  FontColor #0F172A
+}
+
+title Payload-free graph with external evidence
+
+rectangle "Canonical CSR\n<latex>|V|</latex> vertices; <latex>|E|</latex> edges\nno payload fields" as csr #DBEAFE
+rectangle "Flat provenance sidecar\n<latex>|E|+1</latex> offsets; <latex>|P|</latex> opaque keys\nsorted unique fibers" as sidecar #C4B5FD
+rectangle "Reachability search\nexplicit queue and parent-edge map" as search #A7F3D0
+rectangle "Edge-index path witness\nsource + canonical edge indices + target" as path #FDE68A
+rectangle "SCC quotient witness fibers\nall source edges for each quotient edge" as quotient #99F6E4
+rectangle "Transported order policy\nrequired only to select one witness" as policy #FBCFE8
+rectangle "Rooted dominance\nLengauer–Tarjan tree and frontiers" as dominance #FED7AA
+
+csr -[#2563EB,bold]-> search : canonical adjacency
+search -[#059669,bold]-> path : reconstruct iteratively
+csr -[#0D9488,bold]-> quotient : map edge endpoints through SCC fibers
+sidecar -[#7C3AED,bold]-> quotient : deterministic union by quotient fiber
+policy -[#DB2777,bold]-> quotient : optional least representative
+csr -[#D97706,bold]-> dominance : rooted structural relation
+path -[#D97706,dashed]-> dominance : replayable reachability evidence
+
+note bottom of sidecar #EDE9FE
+  Provenance values remain opaque.
+  The sidecar can be absent or have empty fibers.
+  CSR layout and hot traversal are unchanged.
+end note
+
+note bottom of policy #FCE7F3
+  Without a transported strict total order,
+  a symmetric witness fiber has no natural
+  deterministic single-element selector.
+end note
+@enduml

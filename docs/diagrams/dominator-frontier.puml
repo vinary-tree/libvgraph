@@ -1,0 +1,40 @@
+@startuml
+skinparam backgroundColor #F8FAFC
+skinparam defaultFontName DejaVu Sans
+skinparam shadowing false
+skinparam ArrowColor #334155
+skinparam ArrowThickness 2
+skinparam rectangle {
+  BorderColor #334155
+  FontColor #0F172A
+}
+
+title Rooted dominators and one dominance frontier
+
+rectangle "root <latex>r</latex>" as root #DBEAFE
+rectangle "branch <latex>a</latex>" as a #A7F3D0
+rectangle "branch <latex>b</latex>" as b #A7F3D0
+rectangle "join <latex>j</latex>" as join #FDE68A
+rectangle "exit <latex>x</latex>" as exit #FED7AA
+rectangle "Dominator tree\n<latex>r</latex> immediately dominates\n<latex>a,b,j</latex>" as tree #C4B5FD
+rectangle "Frontier fact\n<latex>j\in DF(a)</latex> and <latex>j\in DF(b)</latex>" as frontier #FBCFE8
+
+root -[#2563EB,bold]-> a
+root -[#2563EB,bold]-> b
+a -[#059669,bold]-> join
+b -[#059669,bold]-> join
+join -[#D97706,bold]-> exit
+
+root -[#7C3AED,dashed]-> tree
+a -[#7C3AED,dashed]-> tree
+b -[#7C3AED,dashed]-> tree
+join -[#7C3AED,dashed]-> tree
+a -[#DB2777,dashed]-> frontier
+b -[#DB2777,dashed]-> frontier
+join -[#DB2777,dashed]-> frontier
+
+note bottom of frontier #FCE7F3
+  Each branch dominates its own predecessor of the join,
+  but neither branch strictly dominates the join.
+end note
+@enduml

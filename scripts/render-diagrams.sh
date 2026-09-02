@@ -16,4 +16,7 @@ JAVA_TOOL_OPTIONS="$vinary_graph_java_options" plantuml -tsvg \
   "$repository_root/docs/diagrams/scc-quotient.puml" \
   "$repository_root/docs/diagrams/formal-first-flow.puml" \
   "$repository_root/docs/diagrams/linear-work-bound.puml" \
-  "$repository_root/docs/diagrams/dependency-wave-execution.puml"
+  "$repository_root/docs/diagrams/dependency-wave-execution.puml" \
+  "$repository_root/docs/diagrams/witness-evidence-flow.puml" \
+  "$repository_root/docs/diagrams/selector-naturality.puml" \
+  "$repository_root/docs/diagrams/dominator-frontier.puml"

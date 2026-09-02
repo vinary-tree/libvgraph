@@ -12,6 +12,9 @@ property graphs, equality graphs, parsers, and weighted automata.
 
 The core has no serialization or hashing dependency. Portable snapshots, schema identities,
 digests, and provenance sidecars belong to the separately versioned `libvgraph-interop` boundary.
+The next formal contract specifies that sidecar boundary together with structural edge-index
+paths, complete condensation witness fibers, rooted dominators, and dominance frontiers before
+any new public API is implemented.
 
 On validated canonical CSR, the required SCC path is iterative, uses strict linear work, retains
 all graph-depth state on the heap, and preserves a constant native control depth. Arbitrary stable
@@ -21,10 +24,14 @@ ordering cost is never conflated with graph-analysis complexity.
 ## Start here
 
 - [Graph quotient theory](docs/theory/graph-quotients.md)
+- [Graph witnesses, provenance fibers, and dominance](docs/theory/graph-witnesses-and-dominance.md)
 - [Formal-first architecture](docs/architecture/formal-first-contract.md)
+- [Witness and provenance architecture](docs/architecture/witness-boundary.md)
 - [Exhaustive validation method](docs/science/exhaustive-validation.md)
+- [Witness formalization validation](docs/science/witness-validation.md)
 - [Implementation refinement matrix](docs/engineering/refinement-matrix.md)
 - [Resource and input safety](docs/security/resource-safety.md)
+- [Witness resource and security contract](docs/security/witness-resource-safety.md)
 - [Rust API and usage](docs/usage/rust-api.md)
 - [Performance and deterministic concurrency](docs/engineering/performance-and-concurrency.md)
 - [Verification workflow](docs/usage/verification-workflow.md)
@@ -39,6 +46,8 @@ every documentation update.
 
 The strengthened formal contract is tracked by pgmcp task `vco-e2-formal-contracts`. Production
 implementation and refinement closeout are tracked by `vco-e2-kernel-implementation`.
+The pre-implementation witness/provenance/dominance contract is tracked by
+`vco-e2-witness-formal`.
 
 ## License
 
