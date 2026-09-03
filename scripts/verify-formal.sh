@@ -98,7 +98,7 @@ verify_tla_release() {
     | tee "$evidence_directory/release-tlc-positive.log"
   rg -q 'Model checking completed. No error has been found' \
     "$evidence_directory/release-tlc-positive.log"
-  rg -q '332 states generated, 236 distinct states found' \
+  rg -q '644 states generated, 452 distinct states found' \
     "$evidence_directory/release-tlc-positive.log"
 
   local configurations=(
@@ -106,19 +106,21 @@ verify_tla_release() {
     ReleaseMachineSkipProtectedHead.cfg
     ReleaseMachineSkipGates.cfg
     ReleaseMachineSkipPortableTools.cfg
+    ReleaseMachineSkipFormalSource.cfg
     ReleaseMachinePublishEarly.cfg
     ReleaseMachineSkipEvidence.cfg
     ReleaseMachineSkipRegistryChecksum.cfg
     ReleaseMachineRepublish.cfg
   )
   local labels=(
-    candidate-policy protected-head gates portable-tools early-publication evidence registry-checksum republish
+    candidate-policy protected-head gates portable-tools formal-source early-publication evidence registry-checksum republish
   )
   local invariants=(
     PublishedUsesProtectedTrust
     PublishedUsesProtectedHead
     PublishedHasPassedGates
     PublishedHasPortableToolClosure
+    PublishedUsesBoundFormalSource
     PublishedFromDraft
     PublishedHasCompleteAssets
     PublishedRegistryMatches
@@ -189,7 +191,7 @@ verify_smt_interop() {
 verify_invariants_interop() {
   "$repository_root/scripts/check-interop-invariants.sh" 2>&1 \
     | tee "$evidence_directory/interop-invariants.log"
-  rg -q '^verified 75 interop and release invariants ' \
+  rg -q '^verified 76 interop and release invariants ' \
     "$evidence_directory/interop-invariants.log"
 }
 

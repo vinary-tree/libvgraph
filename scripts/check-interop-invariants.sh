@@ -15,8 +15,8 @@ if [[ "$actual_header" != "$expected_header" ]]; then
 fi
 
 row_count="$(awk 'NR > 1 { count += 1 } END { print count + 0 }' "$ledger")"
-if [[ "$row_count" -ne 75 ]]; then
-  printf 'expected 75 interop invariant rows, found %s\n' "$row_count" >&2
+if [[ "$row_count" -ne 76 ]]; then
+  printf 'expected 76 interop invariant rows, found %s\n' "$row_count" >&2
   exit 1
 fi
 

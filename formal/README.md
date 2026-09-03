@@ -44,10 +44,11 @@ The formal artifacts precede production implementation.
   grown per read step.
 - `tla/ReleaseMachine.tla` checks the external publication boundary over every Boolean trust,
   gate-result, and portable-tool-closure combination and over absent, matching, and mismatched
-  registry states. The positive model generates 332 states, reaches 236 distinct states at depth 7,
+  registry states. The positive model generates 644 states, reaches 452 distinct states at depth 7,
   and requires protected signer policy, identity with protected default-branch head, successful
   gates backed by a closed portable tool set, a draft containing complete evidence after registry
-  verification, equal package/registry hashes, and at most one publication. Eight causal
+  verification, an exact formal-source binding, equal package/registry hashes, and at most one
+  publication. Nine causal
   configurations each remove exactly one control and must violate its targeted invariant.
 - `smt/interop_snapshot.smt2` proves nine unsatisfiable overflow, bound, separation, and
   fail-closed obligations and produces two constructive satisfiable models.
@@ -56,7 +57,7 @@ The formal artifacts precede production implementation.
   1,593 profile encodings, 9,321 lawful renamings, 180,696 strict prefixes, two golden vectors,
   targeted corruptions, and a 100,000-vertex 64 KiB-stack lifecycle.
 - `verus/interop_refinement.rs` proves six Rust-shaped arithmetic, admission, cursor,
-  and work refinements. `doc/interop-invariants.tsv` maps 75 obligations bijectively onto
+  and work refinements. `doc/interop-invariants.tsv` maps 76 obligations bijectively onto
   fifteen required-red production properties.
 
 Run:
@@ -71,7 +72,7 @@ Run only the snapshot/digest contract:
 scripts/verify-formal.sh interop
 ```
 
-The interop target succeeds only when all positive layers pass, all four codec and eight release
+The interop target succeeds only when all positive layers pass, all four codec and nine release
 causal mutants fail on their intended invariants, and the required-red suite fails solely at the
 unresolved `libvgraph_interop` import.
 
