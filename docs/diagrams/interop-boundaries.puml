@@ -1,0 +1,37 @@
+@startuml
+title Neutral graph core and portable boundary ownership
+skinparam backgroundColor #F8FAFC
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam component {
+  BorderColor #1E3A5F
+  FontColor #0F172A
+}
+skinparam database {
+  BorderColor #7C2D12
+  FontColor #431407
+}
+
+component "Domain adapter\nstable labels + meaning" as domain #FCE7F3
+component "libvgraph\npayload-free canonical CSR\nSCC · quotient · wavefront" as core #DBEAFE
+component "libvgraph-interop\nschema · codec · limits\nprofile binding · digest" as interop #D1FAE5
+database "Portable bytes\nor content-addressed cache" as store #FEF3C7
+component "Independent validator\nexact profile + expected digest" as validator #EDE9FE
+
+domain -right-> core : canonical dense graph
+core -right-> interop : forward offsets + targets
+interop -right-> store : v1.0 bytes + digest
+store -down-> validator : untrusted candidate
+validator -left-> core : validated dense graph
+
+note bottom of core #E0F2FE
+No serialization, hashing, libcpg,
+parser, e-graph, or domain semantics.
+end note
+
+note bottom of interop #DCFCE7
+Request-local mutable state.
+Immutable values are shareable.
+No global lock or input-depth recursion.
+end note
+@enduml

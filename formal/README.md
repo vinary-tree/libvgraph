@@ -32,12 +32,48 @@ The formal artifacts precede production implementation.
 - `scripts/check-core-boundary.sh` checks the Cargo metadata and source surface to ensure the
   payload-free kernel has no serialization dependency or feature. Portable encoding, schema
   identity, hashing, and provenance belong to `libvgraph-interop`.
+- `rocq/GraphSnapshot.v` proves the flat word-tape round trip, uniqueness, exact schema
+  and profile rejection, complete three-buffer heap/work equations, explicit cursor progress,
+  constant native control depth, and tagged digest-preimage separation. Nineteen acceptance
+  theorems must report a closed global context.
+- `tla/InteropCodecMachine.tla` checks two concurrent requests across eleven input
+  classes, cancellation, publication, and resource release. The positive model generates 33,270
+  states, reaches 16,900 distinct states at depth 15, and preserves native control depth one. Three
+  causal configurations must violate `PublicationSound` when schema, canonicality, or cancellation
+  enforcement is removed; a fourth must violate `NativeControlDepthBound` when a native frame is
+  grown per read step.
+- `tla/ReleaseMachine.tla` checks the external publication boundary over every Boolean trust,
+  gate-result, and portable-tool-closure combination and over absent, matching, and mismatched
+  registry states. The positive model generates 332 states, reaches 236 distinct states at depth 7,
+  and requires protected signer policy, identity with protected default-branch head, successful
+  gates backed by a closed portable tool set, a draft containing complete evidence after registry
+  verification, equal package/registry hashes, and at most one publication. Eight causal
+  configurations each remove exactly one control and must violate its targeted invariant.
+- `smt/interop_snapshot.smt2` proves nine unsatisfiable overflow, bound, separation, and
+  fail-closed obligations and produces two constructive satisfiable models.
+- `model/exhaustive_interop.rs` refines the exact 80-byte header, little-endian payload, returned
+  dense-node vector, and complete work/heap bounds over all 531 graphs through three vertices,
+  1,593 profile encodings, 9,321 lawful renamings, 180,696 strict prefixes, two golden vectors,
+  targeted corruptions, and a 100,000-vertex 64 KiB-stack lifecycle.
+- `verus/interop_refinement.rs` proves six Rust-shaped arithmetic, admission, cursor,
+  and work refinements. `doc/interop-invariants.tsv` maps 75 obligations bijectively onto
+  fifteen required-red production properties.
 
 Run:
 
 ```bash
 scripts/verify-formal.sh
 ```
+
+Run only the snapshot/digest contract:
+
+```bash
+scripts/verify-formal.sh interop
+```
+
+The interop target succeeds only when all positive layers pass, all four codec and eight release
+causal mutants fail on their intended invariants, and the required-red suite fails solely at the
+unresolved `libvgraph_interop` import.
 
 The default command checks all six layers. Each layer runs in a transient systemd user scope with
 `MemorySwapMax=0`, one Cargo build job, and an explicit resident-memory ceiling. Rocq, TLA+/TLC,

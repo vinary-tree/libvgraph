@@ -1,0 +1,76 @@
+invariant_id	obligation	layer	artifact	symbol	property
+INT-001	Canonical snapshots decode after encoding	Rocq	formal/rocq/GraphSnapshot.v	decode_encode_round_trip	contract_round_trip
+INT-002	One canonical snapshot has one word encoding	Rocq	formal/rocq/GraphSnapshot.v	canonical_encoding_unique	contract_unique_encoding
+INT-003	Unknown schema identity is rejected	Rocq	formal/rocq/GraphSnapshot.v	unknown_schema_rejected	contract_schema_rejection
+INT-004	Unknown major version is rejected	Rocq	formal/rocq/GraphSnapshot.v	unknown_major_rejected	contract_version_rejection
+INT-005	Unknown minor version is rejected	Rocq	formal/rocq/GraphSnapshot.v	unknown_minor_rejected	contract_exact_cross_version_policy
+INT-006	Semantic profile mismatch is rejected	Rocq	formal/rocq/GraphSnapshot.v	semantic_profile_mismatch_rejected	contract_profile_separation
+INT-007	Admitted vertices respect their limit	Rocq	formal/rocq/GraphSnapshot.v	admitted_snapshot_respects_vertex_limit	contract_resource_limits_fail_before_publication
+INT-008	Admitted edges respect their limit	Rocq	formal/rocq/GraphSnapshot.v	admitted_snapshot_respects_edge_limit	contract_resource_limits_fail_before_publication
+INT-009	Admitted bytes respect their limit	Rocq	formal/rocq/GraphSnapshot.v	admitted_snapshot_respects_byte_limit	contract_resource_limits_fail_before_publication
+INT-010	Complete returned graph heap words are linear	Rocq	formal/rocq/GraphSnapshot.v	decoder_heap_is_linear	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-011	Complete decode including dense nodes and validation is linear	Rocq	formal/rocq/GraphSnapshot.v	decoder_work_is_linear	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-012	Every tape step advances one word	Rocq	formal/rocq/GraphSnapshot.v	decoder_step_progresses	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-013	Tape steps preserve cursor validity	Rocq	formal/rocq/GraphSnapshot.v	decoder_step_preserves_validity	contract_length_index_and_trailing_rejection
+INT-014	Native control depth is constant	Rocq	formal/rocq/GraphSnapshot.v	decoder_native_stack_is_constant	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-015	Digest-purpose domains have distinct preimages	Rocq	formal/rocq/GraphSnapshot.v	digest_domain_separated	contract_digest_domain_schema_and_payload_separation
+INT-016	Schema identities have distinct preimages	Rocq	formal/rocq/GraphSnapshot.v	digest_schema_separated	contract_digest_domain_schema_and_payload_separation
+INT-017	Semantic profiles have distinct preimages	Rocq	formal/rocq/GraphSnapshot.v	digest_profile_separated	contract_profile_separation
+INT-018	Canonical enumeration equality preserves bytes	Rocq	formal/rocq/GraphSnapshot.v	canonical_enumeration_extensional	contract_insertion_order_and_duplicate_invariance
+INT-019	Canonical renamed snapshots round trip	Rocq	formal/rocq/GraphSnapshot.v	canonical_rename_round_trip	contract_lawful_renaming_equivariance
+INT-020	Lifecycle state remains typed	TLC	formal/tla/InteropCodecMachine.tla	TypeOK	contract_round_trip
+INT-021	Cursor and work counters agree	TLC	formal/tla/InteropCodecMachine.tla	CursorBound	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-022	Per-request work and heap stay bounded	TLC	formal/tla/InteropCodecMachine.tla	ResourceBound	contract_resource_limits_fail_before_publication
+INT-023	Allocation follows length admission	TLC	formal/tla/InteropCodecMachine.tla	AllocationAfterLengthAdmission	contract_resource_limits_fail_before_publication
+INT-024	Rejected requests never publish	TLC	formal/tla/InteropCodecMachine.tla	RejectedNeverPublishes	contract_stale_digest_rejection
+INT-025	Exact publication consumes the complete tape	TLC	formal/tla/InteropCodecMachine.tla	ExactHasCompleteTape	contract_round_trip
+INT-026	Admission requires every check	TLC	formal/tla/InteropCodecMachine.tla	AdmissionSound	contract_length_index_and_trailing_rejection
+INT-027	Publication is exact and uncancelled	TLC	formal/tla/InteropCodecMachine.tla	PublicationSound	contract_stale_digest_rejection
+INT-028	Cancellation remains sticky	TLC	formal/tla/InteropCodecMachine.tla	CancellationSticky	contract_resource_limits_fail_before_publication
+INT-029	Native lifecycle control has constant depth	TLC	formal/tla/InteropCodecMachine.tla	NativeControlDepthBound	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-030	Schema-check removal causes publication failure	TLC	formal/tla/InteropCodecMachine.tla	SkipSchema	contract_schema_rejection
+INT-031	Canonical-check removal causes publication failure	TLC	formal/tla/InteropCodecMachine.tla	SkipCanonical	contract_length_index_and_trailing_rejection
+INT-032	Cancellation-check removal causes publication failure	TLC	formal/tla/InteropCodecMachine.tla	IgnoreCancellation	contract_stale_digest_rejection
+INT-033	Maximum v1 byte length fits u64	Z3	formal/smt/interop_snapshot.smt2	wire_length	contract_resource_limits_fail_before_publication
+INT-034	Returned graph uses exact dense-node offset and target words	Z3	formal/smt/interop_snapshot.smt2	heap_words	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-035	Complete decode cannot exceed its linear charge	Z3	formal/smt/interop_snapshot.smt2	actual_work	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-036	Digest domain is constructor-separated	Z3	formal/smt/interop_snapshot.smt2	preimage-domain	contract_digest_domain_schema_and_payload_separation
+INT-037	Digest schema is constructor-separated	Z3	formal/smt/interop_snapshot.smt2	preimage-schema	contract_digest_domain_schema_and_payload_separation
+INT-038	Digest profile is constructor-separated	Z3	formal/smt/interop_snapshot.smt2	preimage-profile	contract_profile_separation
+INT-039	Schema bypass cannot publish	Z3	formal/smt/interop_snapshot.smt2	schema-ok	contract_schema_rejection
+INT-040	Profile bypass cannot publish	Z3	formal/smt/interop_snapshot.smt2	profile-ok	contract_profile_separation
+INT-041	Cancellation bypass cannot publish	Z3	formal/smt/interop_snapshot.smt2	cancelled	contract_stale_digest_rejection
+INT-042	Rejected stale input has a constructive model	Z3	formal/smt/interop_snapshot.smt2	A stale/schema-mismatched candidate	contract_stale_digest_rejection
+INT-043	Fully admitted input has a constructive model	Z3	formal/smt/interop_snapshot.smt2	A fully admitted candidate	contract_round_trip
+INT-044	Exact 80-byte header and u32 payload refine words	Model	formal/model/exhaustive_interop.rs	HEADER_BYTES	contract_round_trip
+INT-045	Canonical builder removes order and duplicates	Model	formal/model/exhaustive_interop.rs	canonical_snapshot	contract_insertion_order_and_duplicate_invariance
+INT-046	Byte encoder preallocates exact output	Model	formal/model/exhaustive_interop.rs	fn encode	contract_unique_encoding
+INT-047	Decoder checks before graph publication	Model	formal/model/exhaustive_interop.rs	fn decode	contract_length_index_and_trailing_rejection
+INT-048	All CSR structural laws are checked	Model	formal/model/exhaustive_interop.rs	validate_snapshot_with_work	contract_length_index_and_trailing_rejection
+INT-049	Digest invocation includes schema profile length payload	Model	formal/model/exhaustive_interop.rs	digest_invocation	contract_digest_domain_schema_and_payload_separation
+INT-050	All graphs through three vertices are enumerated	Model	formal/model/exhaustive_interop.rs	assert_eq!(graph_count, 531)	contract_round_trip
+INT-051	Every strict prefix is rejected	Model	formal/model/exhaustive_interop.rs	truncation_count	contract_length_index_and_trailing_rejection
+INT-052	Two fixed golden vectors are exact	Model	formal/model/exhaustive_interop.rs	assert_golden_vectors	contract_unique_encoding
+INT-053	Unknown schema and versions reject	Model	formal/model/exhaustive_interop.rs	assert_malformed_rejections	contract_exact_cross_version_policy
+INT-054	Lawful renaming transports edges	Model	formal/model/exhaustive_interop.rs	renamed_edges	contract_lawful_renaming_equivariance
+INT-055	Digest domain collisions are causally mutated	Model	formal/model/exhaustive_interop.rs	assert_digest_domains	contract_digest_domain_schema_and_payload_separation
+INT-056	One hundred thousand vertices fit 64 KiB native stack	Model	formal/model/exhaustive_interop.rs	assert_deep_small_stack	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-057	Maximum v1 byte length is representable	Verus	formal/verus/interop_refinement.rs	maximum_v1_wire_length_fits_u64	contract_resource_limits_fail_before_publication
+INT-058	Maximum v1 heap word count is representable	Verus	formal/verus/interop_refinement.rs	maximum_v1_heap_words_fit_u64	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-059	Successful admission implies every bound	Verus	formal/verus/interop_refinement.rs	admission_is_fail_closed	contract_resource_limits_fail_before_publication
+INT-060	Cursor progress decreases remaining tape	Verus	formal/verus/interop_refinement.rs	decoder_cursor_step_is_bounded	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-061	Validation charge is linear	Verus	formal/verus/interop_refinement.rs	validation_work_is_linear	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-062	Every encoding includes a complete header	Verus	formal/verus/interop_refinement.rs	fixed_header_prevents_empty_encoding	contract_round_trip
+INT-063	Stale digest never publishes required red	RequiredRed	tests/interop_contract_properties.rs	contract_stale_digest_rejection	contract_stale_digest_rejection
+INT-064	Exact version policy is executable required red	RequiredRed	tests/interop_contract_properties.rs	contract_exact_cross_version_policy	contract_exact_cross_version_policy
+INT-065	No unmodeled snapshot API is silently accepted	RequiredRed	tests/interop_contract_properties.rs	libvgraph_interop	contract_schema_rejection
+INT-066	Native-depth growth causes the control-depth invariant to fail	TLC	formal/tla/InteropCodecMachine.tla	GrowNativeDepth	contract_deep_codec_lifecycle_is_native_stack_independent
+INT-067	A published release is authorized only by the protected signer policy	TLC	formal/tla/ReleaseMachine.tla	PublishedUsesProtectedTrust	contract_release_publication_is_fail_closed
+INT-068	A published tag resolves to the protected default-branch head	TLC	formal/tla/ReleaseMachine.tla	PublishedUsesProtectedHead	contract_release_publication_is_fail_closed
+INT-069	A published release has passed and recorded every acceptance gate	TLC	formal/tla/ReleaseMachine.tla	PublishedHasPassedGates	contract_release_publication_is_fail_closed
+INT-070	A release is drafted before any publication transition	TLC	formal/tla/ReleaseMachine.tla	PublishedFromDraft	contract_release_publication_is_fail_closed
+INT-071	A published release has the exact package and complete evidence assets	TLC	formal/tla/ReleaseMachine.tla	PublishedHasCompleteAssets	contract_release_publication_is_fail_closed
+INT-072	The registry artifact hash equals the verified package hash before publication	TLC	formal/tla/ReleaseMachine.tla	PublishedRegistryMatches	contract_release_publication_is_fail_closed
+INT-073	One version can cross the publication transition at most once	TLC	formal/tla/ReleaseMachine.tla	AtMostOnePublication	contract_release_publication_is_fail_closed
+INT-074	A rejected candidate can never become published	TLC	formal/tla/ReleaseMachine.tla	RejectedNeverPublishes	contract_release_publication_is_fail_closed
+INT-075	A published release has a closed portable tool dependency set	TLC	formal/tla/ReleaseMachine.tla	PublishedHasPortableToolClosure	contract_release_portable_tool_closure_is_explicit
