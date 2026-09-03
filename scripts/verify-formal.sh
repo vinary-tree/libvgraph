@@ -22,6 +22,11 @@ if [[ "$verification_target" != all && "${LIBVGRAPH_FORMAL_SCOPED:-0}" != 1 ]]; 
     "$repository_root/scripts/verify-formal.sh" "$verification_target"
 fi
 
+if [[ "$verification_target" != all ]]; then
+  "$repository_root/scripts/check-lockfile-portability.sh" 2>&1 \
+    | tee "$evidence_directory/lockfile-portability.log"
+fi
+
 verify_boundary() {
   LIBVGRAPH_BOUNDARY_SCOPED=1 "$repository_root/scripts/check-core-boundary.sh"
 }
