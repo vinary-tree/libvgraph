@@ -14,11 +14,20 @@ From the repository root, run:
 scripts/verify-formal.sh all
 ```
 
-The command must finish with 28 closed-context messages from Rocq, a no-error TLC completion, the
-exact exhaustive-oracle summary including exact linear Tarjan work and the 256 KiB stack gate,
-six Verus proofs with zero errors, four successful Kani harnesses, and a successful neutral-core
-dependency-boundary check. A nonzero exit, resource-cap termination, or missing success marker
-fails the gate.
+The command must finish with a repository-only lockfile pass, 28 closed-context messages from
+Rocq, a no-error TLC completion, the exact exhaustive-oracle summary including exact linear Tarjan
+work and the 256 KiB stack gate, six Verus proofs with zero errors, four successful Kani harnesses,
+and a successful neutral-core dependency-boundary check. A nonzero exit, resource-cap termination,
+or missing success marker fails the gate.
+
+Before any concrete formal target can execute a resolver-affecting Cargo command,
+`scripts/check-lockfile-portability.sh` enumerates every tracked `Cargo.lock` file. The check is
+fail-closed: the set must be nonempty, each entry must be a regular repository file rather than a
+symbolic link, and no entry may contain a `[[patch.unused]]` table. Cargo writes that table when a
+dependency patch was visible but unused; retaining it can encode a developer's ambient Cargo
+configuration rather than repository-owned resolution. The check copies each tracked lockfile to
+a repository-backed test directory, injects an unused-patch table, and requires the mutant to be
+rejected. It also requires missing-file and symbolic-link mutants to be rejected.
 
 Every individual layer self-launches through `systemd-run --user --scope`. The wrapper sets
 `MemorySwapMax=0`, `CARGO_BUILD_JOBS=1`, a 100% CPU quota, a finite task limit, and a repository
