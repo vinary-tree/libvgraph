@@ -4,8 +4,8 @@ EXTENDS Naturals, TLC
 CONSTANT Mutant
 
 ASSUME Mutant \in {"None", "CandidatePolicy", "SkipProtectedHead", "SkipGates",
-                   "SkipPortableTools", "PublishEarly", "SkipEvidence",
-                   "SkipRegistryChecksum", "Republish"}
+                   "SkipPortableTools", "SkipFormalSource", "PublishEarly",
+                   "SkipEvidence", "SkipRegistryChecksum", "Republish"}
 
 Phases == {"Verify", "CandidateVerified", "GatesPassed", "Draft", "AssetsAttached",
            "RegistryVerified", "Published", "Rejected"}
@@ -18,6 +18,7 @@ VARIABLES phase,
           candidateAtProtectedHead,
           gatesSucceed,
           portableToolsReady,
+          formalSourceMatchesBinding,
           registryState,
           gatesRecorded,
           draftCreated,
@@ -29,12 +30,14 @@ VARIABLES phase,
           publicationCount
 
 vars == <<phase, protectedSignerAccepts, candidateSignerAccepts,
-          candidateAtProtectedHead, gatesSucceed, portableToolsReady, registryState,
+          candidateAtProtectedHead, gatesSucceed, portableToolsReady,
+          formalSourceMatchesBinding, registryState,
           gatesRecorded, draftCreated, packageHash, assetHash, evidenceComplete,
           registryHash, published, publicationCount>>
 
 Inputs == <<protectedSignerAccepts, candidateSignerAccepts,
-            candidateAtProtectedHead, gatesSucceed, portableToolsReady, registryState>>
+            candidateAtProtectedHead, gatesSucceed, portableToolsReady,
+            formalSourceMatchesBinding, registryState>>
 
 Init ==
   /\ phase = "Verify"
@@ -43,6 +46,7 @@ Init ==
   /\ candidateAtProtectedHead \in BOOLEAN
   /\ gatesSucceed \in BOOLEAN
   /\ portableToolsReady \in BOOLEAN
+  /\ formalSourceMatchesBinding \in BOOLEAN
   /\ registryState \in RegistryStates
   /\ gatesRecorded = FALSE
   /\ draftCreated = FALSE
@@ -71,9 +75,11 @@ VerifyCandidate ==
 RunGates ==
   /\ phase = "CandidateVerified"
   /\ phase' =
-       IF (gatesSucceed /\ portableToolsReady)
+       IF (gatesSucceed /\ portableToolsReady /\ formalSourceMatchesBinding)
             \/ Mutant = "SkipGates"
-            \/ (Mutant = "SkipPortableTools" /\ gatesSucceed)
+            \/ (Mutant = "SkipPortableTools" /\ gatesSucceed
+                  /\ formalSourceMatchesBinding)
+            \/ (Mutant = "SkipFormalSource" /\ gatesSucceed /\ portableToolsReady)
        THEN "GatesPassed"
        ELSE "Rejected"
   /\ gatesRecorded' = gatesSucceed
@@ -157,6 +163,7 @@ TypeOK ==
   /\ candidateAtProtectedHead \in BOOLEAN
   /\ gatesSucceed \in BOOLEAN
   /\ portableToolsReady \in BOOLEAN
+  /\ formalSourceMatchesBinding \in BOOLEAN
   /\ registryState \in RegistryStates
   /\ gatesRecorded \in BOOLEAN
   /\ draftCreated \in BOOLEAN
@@ -178,6 +185,9 @@ PublishedHasPassedGates ==
 
 PublishedHasPortableToolClosure ==
   published => portableToolsReady
+
+PublishedUsesBoundFormalSource ==
+  published => formalSourceMatchesBinding
 
 PublishedFromDraft ==
   published => draftCreated

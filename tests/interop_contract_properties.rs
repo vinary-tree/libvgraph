@@ -323,6 +323,7 @@ struct ReleaseEvidence {
     protected_head: bool,
     gates_passed: bool,
     portable_tool_closure: bool,
+    formal_source_matches_binding: bool,
     draft_created: bool,
     assets_complete: bool,
     registry_matches: bool,
@@ -334,6 +335,7 @@ fn release_publishable(evidence: ReleaseEvidence) -> bool {
         && evidence.protected_head
         && evidence.gates_passed
         && evidence.portable_tool_closure
+        && evidence.formal_source_matches_binding
         && evidence.draft_created
         && evidence.assets_complete
         && evidence.registry_matches
@@ -347,6 +349,7 @@ fn contract_release_publication_is_fail_closed() {
         protected_head: true,
         gates_passed: true,
         portable_tool_closure: true,
+        formal_source_matches_binding: true,
         draft_created: true,
         assets_complete: true,
         registry_matches: true,
@@ -369,6 +372,10 @@ fn contract_release_publication_is_fail_closed() {
         },
         ReleaseEvidence {
             portable_tool_closure: false,
+            ..complete
+        },
+        ReleaseEvidence {
+            formal_source_matches_binding: false,
             ..complete
         },
         ReleaseEvidence {
@@ -402,6 +409,7 @@ fn contract_release_portable_tool_closure_is_explicit() {
         protected_head: true,
         gates_passed: true,
         portable_tool_closure: true,
+        formal_source_matches_binding: true,
         draft_created: true,
         assets_complete: true,
         registry_matches: true,
@@ -412,4 +420,47 @@ fn contract_release_portable_tool_closure_is_explicit() {
         portable_tool_closure: false,
         ..publishable
     }));
+}
+
+proptest! {
+    #[test]
+    fn contract_release_formal_source_binding_is_explicit(
+        protected_signer in any::<bool>(),
+        protected_head in any::<bool>(),
+        gates_passed in any::<bool>(),
+        portable_tool_closure in any::<bool>(),
+        draft_created in any::<bool>(),
+        assets_complete in any::<bool>(),
+        registry_matches in any::<bool>(),
+        publication_count in 0_u8..=2,
+    ) {
+        let unbound = ReleaseEvidence {
+            protected_signer,
+            protected_head,
+            gates_passed,
+            portable_tool_closure,
+            formal_source_matches_binding: false,
+            draft_created,
+            assets_complete,
+            registry_matches,
+            publication_count,
+        };
+        prop_assert!(!release_publishable(unbound));
+
+        let bound = ReleaseEvidence {
+            formal_source_matches_binding: true,
+            ..unbound
+        };
+        prop_assert_eq!(
+            release_publishable(bound),
+            protected_signer
+                && protected_head
+                && gates_passed
+                && portable_tool_closure
+                && draft_created
+                && assets_complete
+                && registry_matches
+                && publication_count == 1,
+        );
+    }
 }
