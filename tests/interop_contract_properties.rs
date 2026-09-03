@@ -322,6 +322,7 @@ struct ReleaseEvidence {
     protected_signer: bool,
     protected_head: bool,
     gates_passed: bool,
+    portable_tool_closure: bool,
     draft_created: bool,
     assets_complete: bool,
     registry_matches: bool,
@@ -332,6 +333,7 @@ fn release_publishable(evidence: ReleaseEvidence) -> bool {
     evidence.protected_signer
         && evidence.protected_head
         && evidence.gates_passed
+        && evidence.portable_tool_closure
         && evidence.draft_created
         && evidence.assets_complete
         && evidence.registry_matches
@@ -344,6 +346,7 @@ fn contract_release_publication_is_fail_closed() {
         protected_signer: true,
         protected_head: true,
         gates_passed: true,
+        portable_tool_closure: true,
         draft_created: true,
         assets_complete: true,
         registry_matches: true,
@@ -362,6 +365,10 @@ fn contract_release_publication_is_fail_closed() {
         },
         ReleaseEvidence {
             gates_passed: false,
+            ..complete
+        },
+        ReleaseEvidence {
+            portable_tool_closure: false,
             ..complete
         },
         ReleaseEvidence {
@@ -386,4 +393,23 @@ fn contract_release_publication_is_fail_closed() {
         },
     ];
     assert!(rejected.into_iter().all(|case| !release_publishable(case)));
+}
+
+#[test]
+fn contract_release_portable_tool_closure_is_explicit() {
+    let publishable = ReleaseEvidence {
+        protected_signer: true,
+        protected_head: true,
+        gates_passed: true,
+        portable_tool_closure: true,
+        draft_created: true,
+        assets_complete: true,
+        registry_matches: true,
+        publication_count: 1,
+    };
+    assert!(release_publishable(publishable));
+    assert!(!release_publishable(ReleaseEvidence {
+        portable_tool_closure: false,
+        ..publishable
+    }));
 }

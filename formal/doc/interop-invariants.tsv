@@ -73,3 +73,4 @@ INT-071	A published release has the exact package and complete evidence assets	T
 INT-072	The registry artifact hash equals the verified package hash before publication	TLC	formal/tla/ReleaseMachine.tla	PublishedRegistryMatches	contract_release_publication_is_fail_closed
 INT-073	One version can cross the publication transition at most once	TLC	formal/tla/ReleaseMachine.tla	AtMostOnePublication	contract_release_publication_is_fail_closed
 INT-074	A rejected candidate can never become published	TLC	formal/tla/ReleaseMachine.tla	RejectedNeverPublishes	contract_release_publication_is_fail_closed
+INT-075	A published release has a closed portable tool dependency set	TLC	formal/tla/ReleaseMachine.tla	PublishedHasPortableToolClosure	contract_release_portable_tool_closure_is_explicit

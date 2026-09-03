@@ -4,7 +4,8 @@ EXTENDS Naturals, TLC
 CONSTANT Mutant
 
 ASSUME Mutant \in {"None", "CandidatePolicy", "SkipProtectedHead", "SkipGates",
-                   "PublishEarly", "SkipEvidence", "SkipRegistryChecksum", "Republish"}
+                   "SkipPortableTools", "PublishEarly", "SkipEvidence",
+                   "SkipRegistryChecksum", "Republish"}
 
 Phases == {"Verify", "CandidateVerified", "GatesPassed", "Draft", "AssetsAttached",
            "RegistryVerified", "Published", "Rejected"}
@@ -16,6 +17,7 @@ VARIABLES phase,
           candidateSignerAccepts,
           candidateAtProtectedHead,
           gatesSucceed,
+          portableToolsReady,
           registryState,
           gatesRecorded,
           draftCreated,
@@ -27,12 +29,12 @@ VARIABLES phase,
           publicationCount
 
 vars == <<phase, protectedSignerAccepts, candidateSignerAccepts,
-          candidateAtProtectedHead, gatesSucceed, registryState, gatesRecorded,
-          draftCreated, packageHash, assetHash, evidenceComplete, registryHash,
-          published, publicationCount>>
+          candidateAtProtectedHead, gatesSucceed, portableToolsReady, registryState,
+          gatesRecorded, draftCreated, packageHash, assetHash, evidenceComplete,
+          registryHash, published, publicationCount>>
 
 Inputs == <<protectedSignerAccepts, candidateSignerAccepts,
-            candidateAtProtectedHead, gatesSucceed, registryState>>
+            candidateAtProtectedHead, gatesSucceed, portableToolsReady, registryState>>
 
 Init ==
   /\ phase = "Verify"
@@ -40,6 +42,7 @@ Init ==
   /\ candidateSignerAccepts \in BOOLEAN
   /\ candidateAtProtectedHead \in BOOLEAN
   /\ gatesSucceed \in BOOLEAN
+  /\ portableToolsReady \in BOOLEAN
   /\ registryState \in RegistryStates
   /\ gatesRecorded = FALSE
   /\ draftCreated = FALSE
@@ -68,7 +71,9 @@ VerifyCandidate ==
 RunGates ==
   /\ phase = "CandidateVerified"
   /\ phase' =
-       IF gatesSucceed \/ Mutant = "SkipGates"
+       IF (gatesSucceed /\ portableToolsReady)
+            \/ Mutant = "SkipGates"
+            \/ (Mutant = "SkipPortableTools" /\ gatesSucceed)
        THEN "GatesPassed"
        ELSE "Rejected"
   /\ gatesRecorded' = gatesSucceed
@@ -151,6 +156,7 @@ TypeOK ==
   /\ candidateSignerAccepts \in BOOLEAN
   /\ candidateAtProtectedHead \in BOOLEAN
   /\ gatesSucceed \in BOOLEAN
+  /\ portableToolsReady \in BOOLEAN
   /\ registryState \in RegistryStates
   /\ gatesRecorded \in BOOLEAN
   /\ draftCreated \in BOOLEAN
@@ -169,6 +175,9 @@ PublishedUsesProtectedHead ==
 
 PublishedHasPassedGates ==
   published => gatesSucceed /\ gatesRecorded
+
+PublishedHasPortableToolClosure ==
+  published => portableToolsReady
 
 PublishedFromDraft ==
   published => draftCreated
