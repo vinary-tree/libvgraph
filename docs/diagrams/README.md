@@ -6,5 +6,6 @@
 | Formal-first flow | [formal-first-flow.puml](formal-first-flow.puml) | Shows proof/model/oracle gates before implementation |
 | Linear work bound | [linear-work-bound.puml](linear-work-bound.puml) | Shows exact SCC events, phase-complete work, and reusable-workspace bounds |
 | Dependency-wave execution | [dependency-wave-execution.puml](dependency-wave-execution.puml) | Shows deterministic parallel evaluation with per-wave barriers and ordered commit |
+| Borrowed CSR refinement | [borrowed-csr-refinement.puml](borrowed-csr-refinement.puml) | Shows the libcpg ownership boundary, fused validation order, shared iterative SCC kernel, and result mapping |
 
 Run `scripts/render-diagrams.sh` and commit all PlantUML sources with their current SVG renderings.

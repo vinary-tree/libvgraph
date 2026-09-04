@@ -11,6 +11,243 @@ struct DfsFrame {
     next_successor: usize,
 }
 
+#[derive(Clone, Copy)]
+struct BorrowedDfsFrame {
+    node: u32,
+    cursor: usize,
+    stop: usize,
+    previous_target: Option<u32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BorrowedError {
+    Cancelled,
+    Header,
+    Offset,
+    Target,
+    Order,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct BorrowedValidationMetrics {
+    header_checks: usize,
+    row_checks: usize,
+    edge_checks: usize,
+    peak_frames: usize,
+    peak_active: usize,
+    input_clone_slots: usize,
+}
+
+impl BorrowedValidationMetrics {
+    fn work(self) -> usize {
+        self.header_checks + self.row_checks + self.edge_checks
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ValidationBudget {
+    remaining: Option<usize>,
+}
+
+impl ValidationBudget {
+    fn new(remaining: Option<usize>) -> Self {
+        Self { remaining }
+    }
+
+    fn step(&mut self) -> Result<(), BorrowedError> {
+        match self.remaining {
+            Some(0) => Err(BorrowedError::Cancelled),
+            Some(remaining) => {
+                self.remaining = Some(remaining - 1);
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
+}
+
+fn checked_borrowed_frame(
+    vertex: u32,
+    offsets: &[u32],
+    target_count: usize,
+    budget: &mut ValidationBudget,
+    metrics: &mut BorrowedValidationMetrics,
+) -> Result<BorrowedDfsFrame, BorrowedError> {
+    budget.step()?;
+    metrics.row_checks += 1;
+    let vertex_index = vertex as usize;
+    let start = *offsets.get(vertex_index).ok_or(BorrowedError::Header)? as usize;
+    let stop = *offsets.get(vertex_index + 1).ok_or(BorrowedError::Header)? as usize;
+    if start > stop || stop > target_count {
+        return Err(BorrowedError::Offset);
+    }
+    Ok(BorrowedDfsFrame {
+        node: vertex,
+        cursor: start,
+        stop,
+        previous_target: None,
+    })
+}
+
+fn borrowed_tarjan(
+    vertex_count: u32,
+    offsets: &[u32],
+    targets: &[u32],
+    work_limit: Option<usize>,
+) -> Result<(Vec<Vec<usize>>, BorrowedValidationMetrics), BorrowedError> {
+    const UNVISITED: u32 = u32::MAX;
+    const ASSIGNED: u32 = u32::MAX - 1;
+
+    let mut budget = ValidationBudget::new(work_limit);
+    let mut metrics = BorrowedValidationMetrics::default();
+    budget.step()?;
+    metrics.header_checks += 1;
+
+    let vertex_count_usize = vertex_count as usize;
+    let expected_offsets = vertex_count_usize
+        .checked_add(1)
+        .ok_or(BorrowedError::Header)?;
+    if offsets.len() != expected_offsets
+        || offsets.first().copied() != Some(0)
+        || offsets.last().copied().map(|value| value as usize) != Some(targets.len())
+        || u32::try_from(targets.len()).is_err()
+    {
+        return Err(BorrowedError::Header);
+    }
+
+    let mut discovery = vec![UNVISITED; vertex_count_usize];
+    let mut low_link = vec![0u32; vertex_count_usize];
+    let mut next_index = 0u32;
+    let mut active = Vec::with_capacity(vertex_count_usize);
+    let mut frames = Vec::with_capacity(vertex_count_usize);
+    let mut raw_component_of = vec![UNVISITED; vertex_count_usize];
+    let mut raw_component_count = 0usize;
+
+    for start in 0..vertex_count {
+        let start_index = start as usize;
+        if discovery[start_index] != UNVISITED {
+            continue;
+        }
+        let frame =
+            checked_borrowed_frame(start, offsets, targets.len(), &mut budget, &mut metrics)?;
+        discovery[start_index] = next_index;
+        low_link[start_index] = next_index;
+        next_index = next_index.checked_add(1).ok_or(BorrowedError::Header)?;
+        active.push(start);
+        frames.push(frame);
+        metrics.peak_active = metrics.peak_active.max(active.len());
+        metrics.peak_frames = metrics.peak_frames.max(frames.len());
+
+        while let Some(frame) = frames.last().copied() {
+            let node_index = frame.node as usize;
+            if frame.cursor < frame.stop {
+                budget.step()?;
+                metrics.edge_checks += 1;
+                let target = targets
+                    .get(frame.cursor)
+                    .copied()
+                    .ok_or(BorrowedError::Offset)?;
+                if target >= vertex_count {
+                    return Err(BorrowedError::Target);
+                }
+                if frame
+                    .previous_target
+                    .is_some_and(|previous| previous >= target)
+                {
+                    return Err(BorrowedError::Order);
+                }
+
+                let current = frames
+                    .last_mut()
+                    .expect("the borrowed DFS frame must still exist");
+                current.cursor += 1;
+                current.previous_target = Some(target);
+
+                let target_index = target as usize;
+                match discovery[target_index] {
+                    UNVISITED => {
+                        let child = checked_borrowed_frame(
+                            target,
+                            offsets,
+                            targets.len(),
+                            &mut budget,
+                            &mut metrics,
+                        )?;
+                        discovery[target_index] = next_index;
+                        low_link[target_index] = next_index;
+                        next_index = next_index.checked_add(1).ok_or(BorrowedError::Header)?;
+                        active.push(target);
+                        frames.push(child);
+                        metrics.peak_active = metrics.peak_active.max(active.len());
+                        metrics.peak_frames = metrics.peak_frames.max(frames.len());
+                    }
+                    ASSIGNED => {}
+                    target_discovery => {
+                        low_link[node_index] = low_link[node_index].min(target_discovery);
+                    }
+                }
+                continue;
+            }
+
+            frames.pop();
+            if low_link[node_index] == discovery[node_index] {
+                loop {
+                    let member = active
+                        .pop()
+                        .expect("an SCC root must remain on the borrowed active stack");
+                    let member_index = member as usize;
+                    discovery[member_index] = ASSIGNED;
+                    raw_component_of[member_index] =
+                        u32::try_from(raw_component_count).map_err(|_| BorrowedError::Header)?;
+                    if member == frame.node {
+                        break;
+                    }
+                }
+                raw_component_count += 1;
+            }
+            if let Some(parent) = frames.last() {
+                let parent_index = parent.node as usize;
+                low_link[parent_index] = low_link[parent_index].min(low_link[node_index]);
+            }
+        }
+    }
+
+    if !active.is_empty()
+        || raw_component_of
+            .iter()
+            .any(|component| *component == UNVISITED)
+    {
+        return Err(BorrowedError::Header);
+    }
+
+    let mut raw_to_canonical = vec![usize::MAX; raw_component_count];
+    let mut components = Vec::with_capacity(raw_component_count);
+    for (vertex, raw_component) in raw_component_of.into_iter().enumerate() {
+        let raw_component = raw_component as usize;
+        let canonical = if raw_to_canonical[raw_component] == usize::MAX {
+            let component = components.len();
+            raw_to_canonical[raw_component] = component;
+            components.push(Vec::new());
+            component
+        } else {
+            raw_to_canonical[raw_component]
+        };
+        components[canonical].push(vertex);
+    }
+
+    if metrics.header_checks != 1
+        || metrics.row_checks != vertex_count_usize
+        || metrics.edge_checks != targets.len()
+        || metrics.work() != 1 + vertex_count_usize + targets.len()
+        || metrics.peak_frames > vertex_count_usize
+        || metrics.peak_active > vertex_count_usize
+        || metrics.input_clone_slots != 0
+    {
+        return Err(BorrowedError::Header);
+    }
+    Ok((components, metrics))
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct TarjanMetrics {
     root_checks: usize,
@@ -136,6 +373,33 @@ fn csr_direction_is_well_formed(vertex_count: usize, offsets: &[usize], targets:
             .windows(2)
             .all(|pair| pair[0] < pair[1])
     })
+}
+
+fn raw_u32_csr_is_canonical(vertex_count: u32, offsets: &[u32], targets: &[u32]) -> bool {
+    let vertex_count = vertex_count as usize;
+    if offsets.len() != vertex_count.saturating_add(1)
+        || offsets.first().copied() != Some(0)
+        || offsets.last().copied().map(|offset| offset as usize) != Some(targets.len())
+        || targets
+            .iter()
+            .any(|target| *target as usize >= vertex_count)
+    {
+        return false;
+    }
+    for vertex in 0..vertex_count {
+        let start = offsets[vertex] as usize;
+        let stop = offsets[vertex + 1] as usize;
+        if start > stop || stop > targets.len() {
+            return false;
+        }
+        if targets[start..stop]
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+        {
+            return false;
+        }
+    }
+    true
 }
 
 fn canonical_graph(vertex_count: usize, edges: &[(usize, usize)]) -> Vec<Vec<usize>> {
@@ -541,7 +805,49 @@ fn verify_graph(vertex_count: usize, edges: &[(usize, usize)], rename_cases: &mu
     let oracle = closure_oracle(&adjacency);
     assert_eq!(tarjan, oracle);
 
+    let raw_offsets: Vec<u32> = csr
+        .forward_offsets
+        .iter()
+        .map(|offset| u32::try_from(*offset).expect("the bounded offset must fit u32"))
+        .collect();
+    let raw_targets: Vec<u32> = csr
+        .forward_targets
+        .iter()
+        .map(|target| u32::try_from(*target).expect("the bounded target must fit u32"))
+        .collect();
+    let offsets_identity = raw_offsets.as_ptr();
+    let targets_identity = raw_targets.as_ptr();
+    assert!(raw_u32_csr_is_canonical(
+        u32::try_from(vertex_count).expect("the bounded vertex count must fit u32"),
+        &raw_offsets,
+        &raw_targets
+    ));
+    let (borrowed, borrowed_metrics) = borrowed_tarjan(
+        u32::try_from(vertex_count).expect("the bounded vertex count must fit u32"),
+        &raw_offsets,
+        &raw_targets,
+        None,
+    )
+    .expect("canonical borrowed CSR must be admitted");
+    assert_eq!(borrowed, tarjan);
+    assert_eq!(
+        borrowed_metrics.work(),
+        1 + vertex_count + raw_targets.len()
+    );
+    assert_eq!(borrowed_metrics.input_clone_slots, 0);
+    assert_eq!(offsets_identity, raw_offsets.as_ptr());
+    assert_eq!(targets_identity, raw_targets.as_ptr());
+
     let condensation = condensation_edges(&adjacency, &tarjan);
+    assert_eq!(condensation_edges(&adjacency, &borrowed), condensation);
+    for members in &borrowed {
+        if members.len() == 1 {
+            let vertex = members[0];
+            let has_nonempty_cycle = adjacency[vertex].iter().any(|target| *target == vertex);
+            let has_self_loop = adjacency[vertex].binary_search(&vertex).is_ok();
+            assert_eq!(has_nonempty_cycle, has_self_loop);
+        }
+    }
     let levels = topological_levels(tarjan.len(), &condensation);
     let waves = FlatWaveSchedule::from_levels(&levels);
     assert!(waves.is_valid_for(&levels));
@@ -624,6 +930,108 @@ fn verify_graph(vertex_count: usize, edges: &[(usize, usize)], rename_cases: &mu
     }
 }
 
+fn sequence_from_code(length: usize, radix: u32, mut code: usize) -> Vec<u32> {
+    let mut sequence = Vec::with_capacity(length);
+    for _ in 0..length {
+        sequence.push(
+            u32::try_from(code % radix as usize).expect("the bounded generated digit must fit u32"),
+        );
+        code /= radix as usize;
+    }
+    sequence
+}
+
+fn verify_all_bounded_raw_representations() {
+    const RAW_VERTEX_LIMIT: u32 = 3;
+    const RAW_EDGE_LIMIT: usize = 3;
+    let mut cases = 0u64;
+    for vertex_count in 0..=RAW_VERTEX_LIMIT {
+        for edge_count in 0..=RAW_EDGE_LIMIT {
+            let offset_radix =
+                u32::try_from(edge_count + 2).expect("the bounded offset radix must fit u32");
+            let target_radix = vertex_count + 1;
+            let offset_cases =
+                (offset_radix as usize).pow((vertex_count as usize).saturating_add(1) as u32);
+            let target_cases = (target_radix as usize).pow(edge_count as u32);
+            for offset_code in 0..offset_cases {
+                let offsets = sequence_from_code(
+                    (vertex_count as usize).saturating_add(1),
+                    offset_radix,
+                    offset_code,
+                );
+                for target_code in 0..target_cases {
+                    let targets = sequence_from_code(edge_count, target_radix, target_code);
+                    let expected = raw_u32_csr_is_canonical(vertex_count, &offsets, &targets);
+                    let actual = borrowed_tarjan(vertex_count, &offsets, &targets, None);
+                    assert_eq!(
+                        actual.is_ok(),
+                        expected,
+                        "borrowed admission diverged for V={vertex_count}, offsets={offsets:?}, targets={targets:?}"
+                    );
+                    cases += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(cases, 48_776);
+}
+
+fn verify_required_rejections() {
+    let malformed = [
+        (2, vec![0, 1], vec![1], BorrowedError::Header),
+        (2, vec![1, 1, 1], vec![0], BorrowedError::Header),
+        (2, vec![0, 0, 0], vec![1], BorrowedError::Header),
+        (3, vec![0, 1, 0, 1], vec![0], BorrowedError::Offset),
+        (1, vec![0, 1], vec![1], BorrowedError::Target),
+        (2, vec![0, 2, 2], vec![1, 0], BorrowedError::Order),
+        (1, vec![0, 2], vec![0, 0], BorrowedError::Order),
+    ];
+    for (vertex_count, offsets, targets, expected) in malformed {
+        assert_eq!(
+            borrowed_tarjan(vertex_count, &offsets, &targets, None),
+            Err(expected)
+        );
+    }
+}
+
+fn verify_cancellation_is_fail_atomic() {
+    for vertex_count in 0..=3usize {
+        let graph_count = 1usize << (vertex_count * vertex_count);
+        for mask in 0..graph_count {
+            let edges = graph_edges(vertex_count, mask);
+            let graph = canonical_graph(vertex_count, &edges);
+            let (offsets, targets) = flatten_adjacency(&graph);
+            let offsets: Vec<u32> = offsets
+                .into_iter()
+                .map(|offset| u32::try_from(offset).expect("the bounded offset must fit u32"))
+                .collect();
+            let targets: Vec<u32> = targets
+                .into_iter()
+                .map(|target| u32::try_from(target).expect("the bounded target must fit u32"))
+                .collect();
+            let exact_work = 1 + vertex_count + targets.len();
+            for limit in 0..exact_work {
+                assert_eq!(
+                    borrowed_tarjan(
+                        u32::try_from(vertex_count).expect("the bounded vertex count must fit u32"),
+                        &offsets,
+                        &targets,
+                        Some(limit),
+                    ),
+                    Err(BorrowedError::Cancelled)
+                );
+            }
+            assert!(borrowed_tarjan(
+                u32::try_from(vertex_count).expect("the bounded vertex count must fit u32"),
+                &offsets,
+                &targets,
+                Some(exact_work),
+            )
+            .is_ok());
+        }
+    }
+}
+
 fn verify_deep_small_stack() {
     let worker = thread::Builder::new()
         .name("libvgraph-formal-model".into())
@@ -653,6 +1061,29 @@ fn verify_deep_small_stack() {
             );
             let condensation = condensation_edges(&graph, &components);
             assert_eq!(condensation.len(), DEEP_CHAIN_VERTICES - 1);
+
+            let (offsets, targets) = flatten_adjacency(&graph);
+            let offsets: Vec<u32> = offsets
+                .into_iter()
+                .map(|offset| u32::try_from(offset).expect("the deep offset must fit u32"))
+                .collect();
+            let targets: Vec<u32> = targets
+                .into_iter()
+                .map(|target| u32::try_from(target).expect("the deep target must fit u32"))
+                .collect();
+            let (borrowed_components, borrowed_metrics) = borrowed_tarjan(
+                u32::try_from(DEEP_CHAIN_VERTICES).expect("the deep vertex count must fit u32"),
+                &offsets,
+                &targets,
+                None,
+            )
+            .expect("the deep canonical borrowed CSR must be admitted");
+            assert_eq!(borrowed_components, components);
+            assert_eq!(borrowed_metrics.peak_frames, DEEP_CHAIN_VERTICES);
+            assert_eq!(
+                borrowed_metrics.work(),
+                1 + DEEP_CHAIN_VERTICES + DEEP_CHAIN_VERTICES - 1
+            );
         })
         .expect("the small-stack formal-model worker must spawn");
     worker
@@ -671,8 +1102,11 @@ fn main() {
             graph_cases += 1;
         }
     }
+    verify_all_bounded_raw_representations();
+    verify_required_rejections();
+    verify_cancellation_is_fail_atomic();
     verify_deep_small_stack();
     println!(
-        "verified {graph_cases} directed graphs, {rename_cases} renaming cases, exact linear Tarjan work, flat-wave refinement, and a {DEEP_CHAIN_VERTICES}-vertex 256 KiB-stack chain"
+        "verified {graph_cases} directed graphs, {rename_cases} renaming cases, 48776 raw borrowed representations, fail-atomic cancellation, exact linear Tarjan and fused-validation work, flat-wave refinement, and a {DEEP_CHAIN_VERTICES}-vertex 256 KiB-stack chain"
     );
 }

@@ -1,0 +1,57 @@
+@startuml
+skinparam backgroundColor #F8FAFC
+skinparam defaultFontName DejaVu Sans
+skinparam shadowing false
+skinparam ArrowColor #334155
+skinparam ArrowThickness 2
+skinparam component {
+  BackgroundColor #DBEAFE
+  BorderColor #1D4ED8
+  FontColor #172554
+}
+skinparam rectangle {
+  BackgroundColor #DCFCE7
+  BorderColor #15803D
+  FontColor #14532D
+}
+skinparam note {
+  BackgroundColor #FEF3C7
+  BorderColor #B45309
+  FontColor #78350F
+}
+
+title Borrowed forward-CSR refinement and ownership
+
+package "libcpg — domain layer" #FCE7F3 {
+  component "GraphProjection\nNodeId + offsets + targets\nreverse CSR + weights + provenance" as projection
+  component "SccProjection\nstable NodeId fibers\npublic serde shape" as cpg_result
+}
+
+package "libvgraph — neutral structural kernel" #E0F2FE {
+  rectangle "Borrowed raw-u32 view\nvertex_count, &offsets, &targets" as view
+  rectangle "Owned canonical CSR\nalready validated" as owned
+  rectangle "Fused admission\nheader -> row bounds -> target range/order" as admission
+  rectangle "Shared iterative Tarjan\nexplicit heap frames" as tarjan
+  rectangle "Canonical SCC quotient\nexact condensation" as quotient
+}
+
+projection -[#2563EB]-> view : borrow forward slices\nzero input clone
+view -[#7C3AED,dashed]-> owned : identity denotation\n(no runtime copy)
+view -[#059669]-> admission : O(1) header
+admission -[#059669]-> tarjan : row/edge checks\nfused with traversal
+owned -[#059669]-> tarjan : prevalidated fast path
+tarjan -[#059669]-> quotient : total disjoint fibers
+quotient -[#2563EB]-> cpg_result : map dense ids through NodeId
+
+note bottom of admission
+No slicing before row bounds.
+No Tarjan indexing before target checks.
+No publication before complete success.
+end note
+
+note bottom of tarjan
+Native stack: constant
+Tarjan heap: O(V)
+Full workspace: O(V + E)
+end note
+@enduml

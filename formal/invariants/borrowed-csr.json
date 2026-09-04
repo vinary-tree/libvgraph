@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "contract": "libvgraph borrowed raw-u32 forward CSR refinement",
+  "baseline_commit": "1f5df96651b61e88fe86e84f27c1635a2971c29e",
+  "implementation_work_item": "vco-e2-libcpg-borrowed-csr-api",
+  "invariants": [
+    {
+      "id": "BCSR-001",
+      "statement": "A borrowed observation preserves the caller's offset and target buffer identities and allocates zero input-clone slots.",
+      "rocq": ["borrowed_observation_preserves_buffer_identity", "borrowed_adapter_allocates_no_input_clone"],
+      "tla": ["NoPartialPublication"],
+      "z3_check": 3,
+      "exhaustive": "pointer identity and input_clone_slots assertions in verify_graph",
+      "property_test": "borrowed_compute_preserves_input_buffers"
+    },
+    {
+      "id": "BCSR-002",
+      "statement": "Admission checks offset length, origin, and terminal equality before any row observation.",
+      "rocq": ["borrowed_header_length_exact", "borrowed_header_origin_exact", "borrowed_header_terminal_exact"],
+      "tla": ["HeaderCanonical", "PublishedInputIsCanonical"],
+      "z3_check": 4,
+      "exhaustive": "verify_all_bounded_raw_representations",
+      "required_red": "BorrowedCsrHeaderMutant.cfg",
+      "property_test": "borrowed_rejects_every_malformed_header"
+    },
+    {
+      "id": "BCSR-003",
+      "statement": "Each row's adjacent offsets are ordered and bounded by the target length before slicing.",
+      "rocq": ["borrowed_row_bounds_safe"],
+      "tla": ["RowCanonical", "CheckedRowBeforeIndexed"],
+      "z3_check": 4,
+      "exhaustive": "verify_all_bounded_raw_representations",
+      "required_red": "BorrowedCsrOffsetMutant.cfg",
+      "property_test": "borrowed_rejects_every_invalid_row_bound"
+    },
+    {
+      "id": "BCSR-004",
+      "statement": "Every raw target is range-checked before it indexes dense Tarjan state.",
+      "rocq": ["borrowed_target_range_safe", "borrowed_edge_target_safe"],
+      "tla": ["TargetRangeCanonical", "CheckedBeforeIndexed"],
+      "z3_check": 5,
+      "exhaustive": "verify_required_rejections target case",
+      "required_red": "BorrowedCsrTargetMutant.cfg",
+      "property_test": "borrowed_never_indexes_an_unchecked_target"
+    },
+    {
+      "id": "BCSR-005",
+      "statement": "Targets are strictly increasing inside each admitted row; decreasing and duplicate adjacent targets are rejected.",
+      "rocq": ["borrowed_row_adjacent_targets_strict", "duplicate_row_is_rejected", "decreasing_row_is_rejected"],
+      "tla": ["TargetOrderCanonical", "CheckedBeforeIndexed"],
+      "z3_check": 6,
+      "exhaustive": "verify_required_rejections order and duplicate cases",
+      "required_red": ["BorrowedCsrOrderMutant.cfg", "BorrowedCsrDuplicateMutant.cfg"],
+      "property_test": "borrowed_rejects_noncanonical_target_order"
+    },
+    {
+      "id": "BCSR-006",
+      "statement": "Every admitted borrowed CSR and its owned materialization denote exactly the same directed edge relation.",
+      "rocq": ["borrowed_owned_edge_equivalence"],
+      "tla": ["CanonicalInput"],
+      "z3_check": 7,
+      "exhaustive": "borrowed partition equals owned partition for every graph through four vertices",
+      "property_test": "borrowed_and_owned_graphs_are_extensionally_equal"
+    },
+    {
+      "id": "BCSR-007",
+      "statement": "Malformed, rejected, or cancelled computations publish no partial decomposition.",
+      "rocq": ["publication_iff_admitted", "rejected_input_publishes_nothing"],
+      "tla": ["NoPartialPublication", "RejectedPublishesNothing", "CancelledPublishesNothing"],
+      "z3_check": 8,
+      "exhaustive": "verify_cancellation_is_fail_atomic",
+      "required_red": "BorrowedCsrPublicationMutant.cfg",
+      "property_test": "borrowed_failure_and_cancellation_are_transactional"
+    },
+    {
+      "id": "BCSR-008",
+      "statement": "SCC quotient fibers are total, disjoint, nonempty, and exact for mutual reachability.",
+      "rocq": ["borrowed_scc_fiber_total", "borrowed_scc_fibers_disjoint", "borrowed_scc_fibers_nonempty", "borrowed_scc_kernel_exact"],
+      "tla": ["DoneWorkExact"],
+      "z3_check": 7,
+      "exhaustive": "borrowed Tarjan equals independent transitive-closure oracle",
+      "property_test": "borrowed_scc_fibers_equal_reachability_classes"
+    },
+    {
+      "id": "BCSR-009",
+      "statement": "Canonical component identifiers are ordered by each fiber's least dense member and members are sorted.",
+      "rocq": ["component_ids_are_ordered_by_least_member"],
+      "tla": ["CanonicalInput"],
+      "z3_check": 7,
+      "exhaustive": "ascending dense assignment and permutation assertions",
+      "property_test": "borrowed_component_ids_follow_least_member_order"
+    },
+    {
+      "id": "BCSR-010",
+      "statement": "Condensation contains exactly the distinct cross-fiber source edges and no self-edge.",
+      "rocq": ["borrowed_condensation_edge_exact"],
+      "tla": ["CanonicalInput"],
+      "z3_check": 7,
+      "exhaustive": "borrowed and owned condensation edge-set equality",
+      "property_test": "borrowed_condensation_is_exact_quotient"
+    },
+    {
+      "id": "BCSR-011",
+      "statement": "A singleton SCC has a nonempty directed cycle exactly when its sole vertex has a self-loop.",
+      "rocq": ["singleton_nonempty_cycle_iff_self_loop"],
+      "tla": ["CanonicalInput"],
+      "z3_check": 7,
+      "exhaustive": "singleton self-cycle equivalence assertion",
+      "property_test": "borrowed_singleton_cycle_flag_equals_self_loop"
+    },
+    {
+      "id": "BCSR-012",
+      "statement": "Fused validation performs exactly one header check, one row check per vertex, and one target check per edge, so work is linear.",
+      "rocq": ["borrowed_validation_work_exact", "borrowed_validation_work_linear", "borrowed_tarjan_validation_is_strictly_linear"],
+      "tla": ["ValidationWorkLinear", "DoneWorkExact"],
+      "z3_check": [1, 2],
+      "exhaustive": "BorrowedValidationMetrics exact-work assertions",
+      "property_test": "borrowed_validation_work_is_exact"
+    },
+    {
+      "id": "BCSR-013",
+      "statement": "Tarjan uses O(V) auxiliary heap; the complete exact pipeline retains the existing O(V+E) workspace and adds no input clone.",
+      "rocq": ["borrowed_pipeline_adds_no_clone_slots", "tarjan_auxiliary_heap_linear", "pipeline_auxiliary_slots_linear"],
+      "tla": ["ValidationWorkLinear"],
+      "z3_check": 3,
+      "exhaustive": "bounded active/frame metrics and zero clone slots",
+      "property_test": "borrowed_workspace_obeys_proven_bounds"
+    },
+    {
+      "id": "BCSR-014",
+      "statement": "Graph depth is represented by explicit heap frames, so native call-stack depth is independent of input depth.",
+      "rocq": ["iterative_control_native_stack_constant"],
+      "tla": ["CheckedRowBeforeIndexed"],
+      "z3_check": 2,
+      "exhaustive": "20,000-vertex chain on a 256 KiB native stack",
+      "property_test": "borrowed_scc_is_stack_safe_on_deep_and_wide_graphs"
+    },
+    {
+      "id": "BCSR-015",
+      "statement": "Permutation and duplicate invariance belong to canonical owned construction; borrowed canonical CSR rejects those noncanonical row representations.",
+      "rocq": ["edge_enumeration_permutation_invariant", "edge_enumeration_duplicate_invariant", "duplicate_row_is_rejected", "decreasing_row_is_rejected"],
+      "tla": ["OrderingCanonical", "PublishedInputIsCanonical"],
+      "z3_check": 6,
+      "exhaustive": "adversarial reversed duplicate owned construction plus raw rejection space",
+      "property_test": "canonical_construction_then_borrowing_is_enumeration_invariant"
+    }
+  ]
+}

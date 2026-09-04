@@ -22,6 +22,7 @@ ordering cost is never conflated with graph-analysis complexity.
 
 - [Graph quotient theory](docs/theory/graph-quotients.md)
 - [Formal-first architecture](docs/architecture/formal-first-contract.md)
+- [Borrowed CSR refinement contract](docs/architecture/borrowed-csr-refinement.md)
 - [Exhaustive validation method](docs/science/exhaustive-validation.md)
 - [Implementation refinement matrix](docs/engineering/refinement-matrix.md)
 - [Resource and input safety](docs/security/resource-safety.md)
