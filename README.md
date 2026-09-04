@@ -24,6 +24,7 @@ ordering cost is never conflated with graph-analysis complexity.
 - [Canonical snapshot laws](docs/theory/canonical-snapshot-laws.md)
 - [Formal-first architecture](docs/architecture/formal-first-contract.md)
 - [Portable snapshot boundary](docs/architecture/interop-boundary.md)
+- [Borrowed CSR refinement contract](docs/architecture/borrowed-csr-refinement.md)
 - [Exhaustive validation method](docs/science/exhaustive-validation.md)
 - [Snapshot validation method](docs/science/interop-validation.md)
 - [Implementation refinement matrix](docs/engineering/refinement-matrix.md)

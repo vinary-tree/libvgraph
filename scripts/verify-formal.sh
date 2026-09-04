@@ -8,15 +8,18 @@ mkdir -p "$evidence_directory" "$repository_tmp"
 
 verification_target="${1:-all}"
 if [[ "$verification_target" != all && "${LIBVGRAPH_FORMAL_SCOPED:-0}" != 1 ]]; then
-  memory_max=4G
-  if [[ "$verification_target" == kani ]]; then
-    memory_max=2G
+  memory_high=1536M
+  memory_max=2G
+  if [[ "$verification_target" == z3 || "$verification_target" == invariants ]]; then
+    memory_high=384M
+    memory_max=512M
   fi
   java_tmp_option="-Djava.io.tmpdir=$repository_tmp"
   java_tool_options="${JAVA_TOOL_OPTIONS:-} $java_tmp_option"
   tla_java_options="${TLA_JAVA_OPTS:-} $java_tmp_option"
   exec systemd-run --user --scope \
-    -p MemoryMax="$memory_max" -p MemorySwapMax=0 -p CPUQuota=100% -p TasksMax=64 \
+    -p MemoryHigh="$memory_high" -p MemoryMax="$memory_max" \
+    -p MemorySwapMax=0 -p CPUQuota=100% -p TasksMax=32 \
     env LIBVGRAPH_FORMAL_SCOPED=1 CARGO_BUILD_JOBS=1 TMPDIR="$repository_tmp" \
     JAVA_TOOL_OPTIONS="$java_tool_options" TLA_JAVA_OPTS="$tla_java_options" \
     "$repository_root/scripts/verify-formal.sh" "$verification_target"
@@ -34,12 +37,17 @@ verify_boundary() {
 verify_rocq() {
   cd "$repository_root/formal/rocq"
   coqc -q GraphQuotient.v 2>&1 | tee "$evidence_directory/rocq.log"
-  rg -q 'Closed under the global context' "$evidence_directory/rocq.log"
+  coqc -q BorrowedCsrRefinement.v 2>&1 \
+    | tee "$evidence_directory/rocq-borrowed-csr.log"
   coqc -q GraphSnapshot.v 2>&1 | tee "$evidence_directory/interop-rocq.log"
+  [[ "$(rg -c '^Closed under the global context$' \
+    "$evidence_directory/rocq.log")" -eq 28 ]]
+  [[ "$(rg -c '^Closed under the global context$' \
+    "$evidence_directory/rocq-borrowed-csr.log")" -eq 27 ]]
   [[ "$(rg -c '^Closed under the global context$' \
     "$evidence_directory/interop-rocq.log")" -eq 19 ]]
   if rg -n '\b(Admitted|admit|Axiom|Parameter|Hypothesis)\b' \
-      GraphQuotient.v GraphSnapshot.v; then
+      GraphQuotient.v BorrowedCsrRefinement.v GraphSnapshot.v; then
     printf '%s\n' 'forbidden Rocq admission or axiom found' >&2
     return 1
   fi
@@ -52,6 +60,37 @@ verify_tla_core() {
     -config IterativeGraphMachine.cfg IterativeGraphMachine.tla 2>&1 \
     | tee "$evidence_directory/tlc.log"
   rg -q 'Model checking completed. No error has been found' "$evidence_directory/tlc.log"
+
+  tla2sany BorrowedCsrMachine.tla 2>&1 \
+    | tee "$evidence_directory/tla-borrowed-csr-syntax.log"
+  tlc -workers 1 -config BorrowedCsrMachine.cfg BorrowedCsrMachine.tla 2>&1 \
+    | tee "$evidence_directory/tlc-borrowed-csr.log"
+  rg -q 'Model checking completed. No error has been found' \
+    "$evidence_directory/tlc-borrowed-csr.log"
+
+  local negative_controls=(
+    "BorrowedCsrHeaderMutant:PublishedInputIsCanonical"
+    "BorrowedCsrOffsetMutant:PublishedInputIsCanonical"
+    "BorrowedCsrTargetMutant:CheckedBeforeIndexed"
+    "BorrowedCsrOrderMutant:CheckedBeforeIndexed"
+    "BorrowedCsrDuplicateMutant:CheckedBeforeIndexed"
+    "BorrowedCsrPublicationMutant:NoPartialPublication"
+  )
+  local entry model invariant log status
+  for entry in "${negative_controls[@]}"; do
+    model="${entry%%:*}"
+    invariant="${entry#*:}"
+    log="$evidence_directory/tlc-${model,,}-required-red.log"
+    set +e
+    tlc -workers 1 -config "$model.cfg" BorrowedCsrMachine.tla 2>&1 | tee "$log"
+    status="${PIPESTATUS[0]}"
+    set -e
+    if [[ "$status" -eq 0 ]]; then
+      printf 'required-red model unexpectedly passed: %s\n' "$model" >&2
+      return 1
+    fi
+    rg -q "Invariant $invariant is violated" "$log"
+  done
 }
 
 verify_tla_interop() {
@@ -149,10 +188,66 @@ verify_tla_release() {
   done
 }
 
+verify_tla_hermetic_cargo() {
+  cd "$repository_root/formal/tla"
+  tla2sany HermeticCargoMachine.tla 2>&1 \
+    | tee "$evidence_directory/hermetic-cargo-tla-syntax.log"
+  tlc -workers 1 -deadlock \
+    -metadir "$evidence_directory/hermetic-cargo-tlc-positive-state" \
+    -config HermeticCargoMachine.cfg HermeticCargoMachine.tla 2>&1 \
+    | tee "$evidence_directory/hermetic-cargo-tlc-positive.log"
+  rg -q 'Model checking completed. No error has been found' \
+    "$evidence_directory/hermetic-cargo-tlc-positive.log"
+  rg -q '10 states generated, 8 distinct states found' \
+    "$evidence_directory/hermetic-cargo-tlc-positive.log"
+
+  local configurations=(
+    HermeticCargoAmbientCwd.cfg
+    HermeticCargoDeveloperHome.cfg
+    HermeticCargoCopiedConfig.cfg
+    HermeticCargoRelativeManifest.cfg
+    HermeticCargoExternalStorage.cfg
+    HermeticCargoNetworkEnabled.cfg
+    HermeticCargoMaskedStatus.cfg
+    HermeticCargoIgnoreLockMutation.cfg
+  )
+  local labels=(
+    ambient-cwd developer-home copied-config relative-manifest external-storage network-enabled masked-status lock-mutation
+  )
+  local invariants=(
+    AcceptedRunIsHermetic
+    AcceptedRunIsHermetic
+    AcceptedRunIsHermetic
+    AcceptedRunIsHermetic
+    AcceptedRunUsesRepositoryStorage
+    AcceptedRunIsHermetic
+    AcceptedRunPreservesStatus
+    AcceptedEvidencePreservesLockfile
+  )
+  local index
+  for index in "${!configurations[@]}"; do
+    local log="$evidence_directory/hermetic-cargo-tlc-mutant-${labels[$index]}.log"
+    set +e
+    tlc -workers 1 -deadlock \
+      -metadir "$evidence_directory/hermetic-cargo-tlc-mutant-${labels[$index]}-state" \
+      -config "${configurations[$index]}" HermeticCargoMachine.tla 2>&1 \
+      | tee "$log"
+    local status="${PIPESTATUS[0]}"
+    set -e
+    if [[ "$status" -eq 0 ]]; then
+      printf 'hermetic Cargo %s mutant unexpectedly satisfied the model\n' \
+        "${labels[$index]}" >&2
+      return 1
+    fi
+    rg -q "Invariant ${invariants[$index]} is violated" "$log"
+  done
+}
+
 verify_tla() {
   verify_tla_core
   verify_tla_interop
   verify_tla_release
+  verify_tla_hermetic_cargo
 }
 
 verify_exhaustive_model() {
@@ -160,6 +255,8 @@ verify_exhaustive_model() {
     -o "$evidence_directory/exhaustive-graphs"
   "$evidence_directory/exhaustive-graphs" 2>&1 | tee "$evidence_directory/exhaustive.log"
   rg -q '^verified 66067 directed graphs,' "$evidence_directory/exhaustive.log"
+  rg -q '48776 raw borrowed representations, fail-atomic cancellation' \
+    "$evidence_directory/exhaustive.log"
   rustc --edition=2021 -D warnings -O \
     "$repository_root/formal/model/exhaustive_interop.rs" \
     -o "$evidence_directory/exhaustive-interop"
@@ -167,6 +264,56 @@ verify_exhaustive_model() {
     | tee "$evidence_directory/interop-model.log"
   rg -q '^verified 531 directed graphs, 1593 profile-bound encodings, 9321 lawful renamings, 180696 strict-prefix rejections,' \
     "$evidence_directory/interop-model.log"
+}
+
+verify_z3() {
+  z3 "$repository_root/formal/z3/BorrowedCsrRefinement.smt2" 2>&1 \
+    | tee "$evidence_directory/z3-borrowed-csr.log"
+  [[ "$(rg -c '^unsat$' "$evidence_directory/z3-borrowed-csr.log")" -eq 8 ]]
+  if rg -q '^(sat|unknown)$' "$evidence_directory/z3-borrowed-csr.log"; then
+    printf '%s\n' 'borrowed-CSR Z3 proof did not discharge every obligation' >&2
+    return 1
+  fi
+
+  z3 "$repository_root/formal/z3/BorrowedCsrRequiredRed.smt2" 2>&1 \
+    | tee "$evidence_directory/z3-borrowed-csr-required-red.log"
+  [[ "$(rg -c '^sat$' "$evidence_directory/z3-borrowed-csr-required-red.log")" -eq 6 ]]
+  if rg -q '^(unsat|unknown)$' \
+      "$evidence_directory/z3-borrowed-csr-required-red.log"; then
+    printf '%s\n' 'a borrowed-CSR Z3 required-red counterexample disappeared' >&2
+    return 1
+  fi
+}
+
+verify_invariant_ledger() {
+  local ledger="$repository_root/formal/invariants/borrowed-csr.json"
+  local cargo_ledger="$repository_root/formal/invariants/hermetic-cargo.json"
+  jq -e '
+    .schema_version == 1 and
+    .baseline_commit == "1f5df96651b61e88fe86e84f27c1635a2971c29e" and
+    (.invariants | length) == 15 and
+    ([.invariants[].id] | unique | length) == 15 and
+    all(.invariants[];
+      (.id | test("^BCSR-[0-9]{3}$")) and
+      (.statement | length > 0) and
+      (.rocq | length > 0) and
+      (.tla | length > 0) and
+      (.exhaustive | length > 0) and
+      (.property_test | length > 0)
+    )
+  ' "$ledger" >/dev/null
+  jq -e '
+    .schema_version == 1 and
+    (.invariants | length) == 8 and
+    ([.invariants[].id] | unique | length) == 8 and
+    all(.invariants[];
+      (.id | test("^HCARGO-[0-9]{3}$")) and
+      (.statement | length > 0) and
+      (.tla | length > 0) and
+      (.required_red | length > 0) and
+      (.acceptance | length > 0)
+    )
+  ' "$cargo_ledger" >/dev/null
 }
 
 verify_verus() {
@@ -202,9 +349,8 @@ verify_invariants_interop() {
 
 verify_required_red_interop() {
   local log="$evidence_directory/interop-required-red.log"
-  cd "$repository_root"
   set +e
-  CARGO_NET_OFFLINE=true cargo test --locked --offline --no-run \
+  "$repository_root/scripts/run-cargo-hermetic.sh" test --no-run \
     --test interop_contract_properties 2>&1 | tee "$log"
   local status="${PIPESTATUS[0]}"
   set -e
@@ -243,7 +389,8 @@ verify_kani() {
   )
   : > "$kani_log"
   for harness in "${harnesses[@]}"; do
-    CARGO_NET_OFFLINE=true cargo kani --harness "$harness" 2>&1 | tee -a "$kani_log"
+    "$repository_root/scripts/run-cargo-hermetic.sh" kani \
+      --harness "$harness" 2>&1 | tee -a "$kani_log"
     if [[ "$(sha256sum "$lockfile" | cut -d ' ' -f 1)" != "$expected_lock_hash" ]]; then
       printf '%s\n' 'cargo-kani modified Cargo.lock; refusing non-locked proof evidence' >&2
       return 1
@@ -298,12 +445,20 @@ case "${1:-all}" in
   kani)
     verify_kani
     ;;
+  z3)
+    verify_z3
+    ;;
+  invariants)
+    verify_invariant_ledger
+    ;;
   all)
     "$repository_root/scripts/verify-formal.sh" boundary
     "$repository_root/scripts/verify-formal.sh" rocq
     "$repository_root/scripts/verify-formal.sh" tla
     "$repository_root/scripts/verify-formal.sh" model
     "$repository_root/scripts/verify-formal.sh" verus
+    "$repository_root/scripts/verify-formal.sh" z3
+    "$repository_root/scripts/verify-formal.sh" invariants
     "$repository_root/scripts/verify-formal.sh" kani
     "$repository_root/scripts/verify-formal.sh" interop-smt
     "$repository_root/scripts/verify-formal.sh" interop-invariants
@@ -311,7 +466,7 @@ case "${1:-all}" in
     ;;
   *)
     printf '%s\n' \
-      'usage: scripts/verify-formal.sh [all|boundary|rocq|tla|model|verus|kani|interop|interop-rocq|interop-tla|release-tla|interop-model|interop-verus|interop-smt|interop-invariants|interop-required-red]' \
+      'usage: scripts/verify-formal.sh [all|boundary|rocq|tla|model|verus|z3|invariants|kani|interop|interop-rocq|interop-tla|release-tla|interop-model|interop-verus|interop-smt|interop-invariants|interop-required-red]' \
       >&2
     exit 2
     ;;

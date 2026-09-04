@@ -9,5 +9,6 @@
 | Snapshot wire layout | [interop-wire-layout.puml](interop-wire-layout.puml) | Fixes every v1.0 byte range, payload array, and exclusion |
 | Snapshot admission machine | [interop-admission-machine.puml](interop-admission-machine.puml) | Shows identity, resource, structural, digest, publication, rejection, and release steps |
 | Interop ownership boundaries | [interop-boundaries.puml](interop-boundaries.puml) | Shows dependency direction across adapters, the neutral core, interop, storage, and validators |
+| Borrowed CSR refinement | [borrowed-csr-refinement.puml](borrowed-csr-refinement.puml) | Shows the libcpg ownership boundary, fused validation order, shared iterative SCC kernel, and result mapping |
 
 Run `scripts/render-diagrams.sh` and commit all PlantUML sources with their current SVG renderings.

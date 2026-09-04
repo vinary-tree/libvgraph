@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "invariants": [
+    {
+      "id": "HCARGO-001",
+      "statement": "Every resolver-affecting Cargo process starts outside the developer home-directory ancestry.",
+      "tla": "HermeticCargoMachine!AcceptedRunIsHermetic",
+      "required_red": "HermeticCargoAmbientCwd.cfg",
+      "acceptance": "scripts/run-cargo-hermetic.sh changes directory to the filesystem root before exec"
+    },
+    {
+      "id": "HCARGO-002",
+      "statement": "Every resolver-affecting Cargo process receives a repository-local isolated Cargo home.",
+      "tla": "HermeticCargoMachine!AcceptedRunIsHermetic",
+      "required_red": "HermeticCargoDeveloperHome.cfg",
+      "acceptance": "scripts/run-cargo-hermetic.sh exports its isolated Cargo home"
+    },
+    {
+      "id": "HCARGO-003",
+      "statement": "The isolated Cargo home contains no ambient Cargo configuration.",
+      "tla": "HermeticCargoMachine!AcceptedRunIsHermetic",
+      "required_red": "HermeticCargoCopiedConfig.cfg",
+      "acceptance": "the launcher rejects config and config.toml inside its isolated Cargo home"
+    },
+    {
+      "id": "HCARGO-004",
+      "statement": "The repository manifest is addressed by an absolute path after changing working directory.",
+      "tla": "HermeticCargoMachine!AcceptedRunIsHermetic",
+      "required_red": "HermeticCargoRelativeManifest.cfg",
+      "acceptance": "every supported launcher branch supplies the absolute repository manifest"
+    },
+    {
+      "id": "HCARGO-005",
+      "statement": "Cargo targets and temporary artifacts are stored below the repository target directory.",
+      "tla": "HermeticCargoMachine!AcceptedRunUsesRepositoryStorage",
+      "required_red": "HermeticCargoExternalStorage.cfg",
+      "acceptance": "the launcher exports repository-backed CARGO_TARGET_DIR and TMPDIR values"
+    },
+    {
+      "id": "HCARGO-006",
+      "statement": "Dependency resolution is offline for every supported Cargo command.",
+      "tla": "HermeticCargoMachine!AcceptedRunIsHermetic",
+      "required_red": "HermeticCargoNetworkEnabled.cfg",
+      "acceptance": "the launcher exports CARGO_NET_OFFLINE=true and supplies --offline when supported"
+    },
+    {
+      "id": "HCARGO-007",
+      "statement": "The launcher preserves the underlying Cargo process exit status.",
+      "tla": "HermeticCargoMachine!AcceptedRunPreservesStatus",
+      "required_red": "HermeticCargoMaskedStatus.cfg",
+      "acceptance": "the launcher replaces itself with Cargo using exec"
+    },
+    {
+      "id": "HCARGO-008",
+      "statement": "No verification evidence is accepted after Cargo changes the repository lockfile.",
+      "tla": "HermeticCargoMachine!AcceptedEvidencePreservesLockfile",
+      "required_red": "HermeticCargoIgnoreLockMutation.cfg",
+      "acceptance": "standard commands use --locked and the Kani verifier compares lockfile hashes after every harness"
+    }
+  ]
+}

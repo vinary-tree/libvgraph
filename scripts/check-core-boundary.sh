@@ -8,13 +8,15 @@ mkdir -p "$evidence_directory" "$repository_tmp"
 
 if [[ "${LIBVGRAPH_BOUNDARY_SCOPED:-0}" != 1 ]]; then
   exec systemd-run --user --scope \
-    -p MemoryMax=4G -p MemorySwapMax=0 -p CPUQuota=100% -p TasksMax=64 \
+    -p MemoryHigh=1536M -p MemoryMax=2G -p MemorySwapMax=0 \
+    -p CPUQuota=100% -p TasksMax=32 \
     env LIBVGRAPH_BOUNDARY_SCOPED=1 CARGO_BUILD_JOBS=1 TMPDIR="$repository_tmp" \
     "$repository_root/scripts/check-core-boundary.sh"
 fi
 
 metadata="$evidence_directory/core-boundary-metadata.json"
-cargo metadata --locked --offline --no-deps --format-version 1 >"$metadata"
+"$repository_root/scripts/run-cargo-hermetic.sh" metadata \
+  --no-deps --format-version 1 >"$metadata"
 
 if ! jq -e '
   (.packages | length) == 1 and

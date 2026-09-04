@@ -17,11 +17,32 @@ The formal artifacts precede production implementation.
 - `tla/IterativeGraphMachine.tla` models a finite explicit-frame traversal with completion and
   cancellation. TLC checks type, ownership, uniqueness, frame bounds, exact discovery/edge/frame
   work accounting, linear work, and exact completed-state work.
+- `rocq/BorrowedCsrRefinement.v` specifies a concrete caller-owned raw-`u32` forward-CSR
+  observation. It proves header, row, target, and strict-order admission; exact borrowed/owned
+  edge equivalence; zero input-clone slots; transactional publication; total and disjoint SCC
+  fibers; least-member component numbering; exact quotient edges; singleton self-cycle
+  equivalence; fused linear validation work; and preservation of the released pipeline workspace
+  bound.
+- `tla/BorrowedCsrMachine.tla` models header admission, per-row bounds, per-edge target
+  range/order checks, indexing, completion, rejection, and cancellation. TLC checks that every
+  index is preceded by both target checks, every edge belongs to an admitted row, publication is
+  complete and canonical, rejection/cancellation publishes nothing, and completed validation
+  performs exactly $`1+|V|+|E|`$ events. Six required-red configurations must violate their
+  designated invariant when a header, offset, target, order, duplicate, or publication check is
+  removed.
 - `model/exhaustive_graphs.rs` enumerates all directed graphs through four vertices, validates
   canonical forward/reverse CSR, compares the iterative SCC model with independent transitive
   closure, checks every vertex permutation together with its induced condensation and ranks, and
   constructs flat wave offsets/members with exact work and constant-buffer checks, and runs a
-  20,000-vertex small-stack lifecycle.
+  20,000-vertex small-stack lifecycle. It also checks 48,776 bounded raw borrowed
+  representations, every cancellation point through three vertices, borrowed/owned SCC and
+  condensation equality, input-buffer identity, zero clone slots, strict fused-validation work,
+  and all malformed-input classes.
+- `z3/BorrowedCsrRefinement.smt2` discharges eight arithmetic, safety, refinement, and
+  transactionality obligations. `z3/BorrowedCsrRequiredRed.smt2` must exhibit six satisfiable
+  counterexamples after mandatory checks are removed.
+- `invariants/borrowed-csr.json` is the machine-readable invariant-to-proof/model/property ledger
+  consumed by the verification script and the subsequent production implementation task.
 - `verus/flat_wave_refinement.rs` proves rank-fiber totality and disjointness, flat-wave storage
   linearity, exact schedule charging, unsigned 64-bit fit in the graph domain, and the uniform
   phase-complete pipeline bound.
@@ -50,6 +71,13 @@ The formal artifacts precede production implementation.
   verification, an exact formal-source binding, equal package/registry hashes, and at most one
   publication. Nine causal
   configurations each remove exactly one control and must violate its targeted invariant.
+- `tla/HermeticCargoMachine.tla` checks the resolver-affecting Cargo execution boundary. The
+  positive model requires a working directory outside the developer home ancestry, an isolated
+  configuration-free Cargo home, an absolute repository manifest, repository-backed target and
+  temporary storage, offline resolution, exact exit-status propagation, and unchanged lockfile
+  evidence. Eight causal configurations each remove one requirement and must violate its targeted
+  invariant. `invariants/hermetic-cargo.json` maps those requirements to the model, mutants, and
+  executable acceptance mechanisms.
 - `smt/interop_snapshot.smt2` proves nine unsatisfiable overflow, bound, separation, and
   fail-closed obligations and produces two constructive satisfiable models.
 - `model/exhaustive_interop.rs` refines the exact 80-byte header, little-endian payload, returned
@@ -76,9 +104,11 @@ The interop target succeeds only when all positive layers pass, all four codec a
 causal mutants fail on their intended invariants, and the required-red suite fails solely at the
 unresolved `libvgraph_interop` import.
 
-The default command checks all six layers. Each layer runs in a transient systemd user scope with
+The default command checks every core, borrowed-CSR, snapshot, and release layer. Each layer runs
+in a transient systemd user scope with
 `MemorySwapMax=0`, one Cargo build job, and an explicit resident-memory ceiling. Rocq, TLA+/TLC,
-the exhaustive model, and Verus receive 4 GiB; Kani/CBMC receives 2 GiB. A cap hit is a failed
+the exhaustive model, Verus, and Kani/CBMC receive at most 2 GiB; Z3 and ledger validation receive
+at most 512 MiB. A cap hit is a failed
 proof gate and must be addressed by reducing verifier state, not by silently increasing the cap.
 Every scope uses a 100% CPU quota and a repository-backed temporary directory. Java and the TLA+
 launcher receive the same repository-local temporary path.
