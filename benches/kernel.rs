@@ -1,7 +1,7 @@
 use core::fmt::Debug;
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use libvgraph::{CsrGraph, SccDecomposition};
+use libvgraph::{BorrowedCsr, CsrGraph, SccDecomposition};
 
 const SIZES: [u32; 3] = [1_000, 10_000, 100_000];
 
@@ -39,11 +39,20 @@ fn benchmark_kernel(criterion: &mut Criterion) {
     for size in SIZES {
         let (nodes, edges) = chain_inputs(size);
         let graph = must(CsrGraph::from_edges(nodes, edges));
+        let raw_targets: Vec<_> = graph.forward_targets().iter().map(|id| id.get()).collect();
+        let borrowed = must(BorrowedCsr::new(
+            size,
+            graph.forward_offsets(),
+            &raw_targets,
+        ));
+        scc.bench_with_input(BenchmarkId::new("owned", size), &graph, |bencher, graph| {
+            bencher.iter(|| must(SccDecomposition::compute(black_box(graph))));
+        });
         scc.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &graph,
+            BenchmarkId::new("borrowed", size),
+            &borrowed,
             |bencher, graph| {
-                bencher.iter(|| must(SccDecomposition::compute(black_box(graph))));
+                bencher.iter(|| must(SccDecomposition::compute_borrowed(black_box(graph))));
             },
         );
     }

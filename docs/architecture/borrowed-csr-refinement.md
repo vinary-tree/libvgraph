@@ -27,6 +27,34 @@ libcpg GraphProjection
 libvgraph does not depend on libcpg, lling-llang, reverse-CSR data,
 application weights, or serialization.
 
+## Public API and failure phases
+
+`BorrowedCsr::new` checks only the constant-size shape header. It does not
+claim that a row or target is valid. `SccDecomposition::compute_borrowed`
+then checks each row and target within the iterative traversal. Both phases
+return structured errors; neither can return a partial decomposition.
+
+```rust
+use libvgraph::{BorrowedCsr, SccDecomposition};
+
+fn example() -> Result<(), Box<dyn std::error::Error>> {
+    let offsets = [0, 1, 2];
+    let targets = [1, 0];
+    let graph = BorrowedCsr::new(2, &offsets, &targets)?;
+    let quotient = SccDecomposition::compute_borrowed(&graph)?;
+    assert_eq!(quotient.component_count(), 1);
+    Ok(())
+}
+```
+
+The borrowed view retains the caller's slices without cloning them. The
+caller must keep the slices alive through computation, as enforced by Rust's
+borrow checker. Reusable `SccWorkspace::compute_borrowed` and controlled
+`compute_borrowed_with_control` variants have the same validation semantics.
+For a completed computation, `SccWorkProfile::validation_work()` reports
+the exact fused validation charge. The owned path reports zero validation
+work because `CsrGraph` construction already checked its representation.
+
 ## Mathematical semantics
 
 Let `V` be the number of dense vertices, `E` the number of forward edges,
@@ -156,6 +184,50 @@ S_{\mathrm{pipeline}}(V,E)\le 9V+2E+2{,}048.
 The borrowed adapter contributes exactly zero input-clone slots. Returned
 fibers and condensation storage are excluded from the reusable-workspace
 bound.
+
+## Pre-registered performance check
+
+`benches/kernel.rs` measures the same iterative SCC decomposition on owned
+and borrowed views of each canonical chain with 1,000, 10,000, and 100,000
+vertices. Input construction and raw-target conversion occur outside each
+timed iteration. The two measurements include the same returned partition and
+quotient work; the borrowed measurement additionally includes its fused
+admission checks. This is an owned-versus-borrowed comparison, **not** a
+comparison of different SCC algorithms.
+
+Before inspecting measurements, the non-inferiority gate is a borrowed/owned
+median-time ratio no greater than 1.50 for 100,000 vertices, and no greater
+than 1.75 for each smaller size. The smaller-size allowance accounts for the
+larger fraction of fixed harness and allocation overhead. Record the
+architecture, compiler version, optimization profile, resource scope, sample
+mode, raw medians, and ratios with any result. A quick-mode run is exploratory
+only; release acceptance requires the normal Criterion sample mode under a
+bounded resident-memory scope. A failed gate calls for profiling and another
+implementation review, not post-hoc relaxation of the gate.
+
+The 2026-09-29 acceptance run used Criterion's normal 100-sample mode,
+`rustc 1.98.1` release builds on an x86-64 AMD Ryzen Threadripper PRO
+5975WX, and a user-systemd scope with a 4 GiB resident-memory ceiling,
+disabled swap, and a 200% CPU quota. The medians below are read from
+Criterion's `new/estimates.json`, not inferred from its displayed mean-time
+estimate. Timings are per decomposition; a ratio below one favors borrowed
+CSR.
+
+| Chain vertices | Owned median | Borrowed median | Borrowed / owned | Gate |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 42.455 microseconds | 40.059 microseconds | 0.9436 | 1.75 |
+| 10,000 | 431.290 microseconds | 423.649 microseconds | 0.9823 | 1.75 |
+| 100,000 | 8.887 milliseconds | 8.366 milliseconds | 0.9413 | 1.50 |
+
+All three measured ratios pass their pre-registered gates. These are
+machine-specific observations, not a claim of universal speedup. Separate
+headless `heaptrack --record-only` captures used Criterion's one-second
+`--profile-time` mode under the same scope. `heaptrack_print` reported
+`16.02M` peak heap consumption for both owned and borrowed 100,000-vertex
+runs. Profiler overhead and slightly different iteration counts preclude a
+precise allocation-count comparison; the zero-input-clone property instead
+rests on the borrowed API's slice identity and its source-level allocation
+boundary, checked by `BCSR-001`.
 
 ## Verification evidence and negative controls
 

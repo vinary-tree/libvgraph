@@ -82,3 +82,13 @@ impl IndexId for ComponentId {
         self.get()
     }
 }
+
+impl IndexId for u32 {
+    fn from_raw(raw: u32) -> Self {
+        raw
+    }
+
+    fn get(self) -> u32 {
+        self
+    }
+}

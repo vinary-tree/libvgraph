@@ -228,6 +228,234 @@ impl<I: IndexId> Csr<I> {
     }
 }
 
+/// Statically dispatched forward adjacency shared by owned and borrowed SCCs.
+///
+/// This is private to the kernel: callers cannot supply an unchecked graph
+/// implementation or introduce a virtual call inside Tarjan's edge loop.
+#[derive(Clone, Copy)]
+pub(crate) struct ForwardCsrView<'a, I: IndexId, const CHECK: bool> {
+    vertex_count: u32,
+    offsets: &'a [u32],
+    targets: &'a [I],
+}
+
+impl<'a, I: IndexId, const CHECK: bool> ForwardCsrView<'a, I, CHECK> {
+    pub(crate) const fn new(vertex_count: u32, offsets: &'a [u32], targets: &'a [I]) -> Self {
+        Self {
+            vertex_count,
+            offsets,
+            targets,
+        }
+    }
+
+    pub(crate) const fn vertex_count(self) -> u32 {
+        self.vertex_count
+    }
+
+    pub(crate) fn edge_count(self) -> usize {
+        self.targets.len()
+    }
+
+    fn successors_unchecked(&self, source: DenseId) -> &'a [I] {
+        let index = source.index();
+        &self.targets[self.offsets[index] as usize..self.offsets[index + 1] as usize]
+    }
+
+    pub(crate) fn checked_row_bounds(&self, source: DenseId) -> Result<(usize, usize), GraphError> {
+        let index = source.index();
+        let start = self.offsets[index];
+        let stop = self.offsets[index + 1];
+        if CHECK {
+            if start > stop {
+                return Err(GraphError::OffsetOrder {
+                    direction: Direction::Forward,
+                    index: index + 1,
+                    previous: start,
+                    next: stop,
+                });
+            }
+            if usize::try_from(stop).map_or(true, |end| end > self.targets.len()) {
+                return Err(GraphError::OffsetOutOfRange {
+                    direction: Direction::Forward,
+                    index: index + 1,
+                    offset: stop,
+                    edge_count: self.targets.len(),
+                });
+            }
+        }
+        let start = usize::try_from(start).map_err(|_| GraphError::OffsetOutOfRange {
+            direction: Direction::Forward,
+            index,
+            offset: start,
+            edge_count: self.targets.len(),
+        })?;
+        let stop = usize::try_from(stop).map_err(|_| GraphError::OffsetOutOfRange {
+            direction: Direction::Forward,
+            index: index + 1,
+            offset: stop,
+            edge_count: self.targets.len(),
+        })?;
+        Ok((start, stop))
+    }
+
+    pub(crate) fn checked_target(
+        &self,
+        source: DenseId,
+        edge_index: usize,
+        previous: Option<u32>,
+    ) -> Result<DenseId, GraphError> {
+        let target = if CHECK {
+            self.targets
+                .get(edge_index)
+                .ok_or(GraphError::OffsetOutOfRange {
+                    direction: Direction::Forward,
+                    index: source.index() + 1,
+                    offset: self.offsets[source.index() + 1],
+                    edge_count: self.targets.len(),
+                })?
+                .get()
+        } else {
+            self.targets[edge_index].get()
+        };
+        if CHECK {
+            if target >= self.vertex_count {
+                return Err(GraphError::TargetOutOfRange {
+                    direction: Direction::Forward,
+                    edge_index,
+                    target,
+                    vertex_count: self.vertex_count,
+                });
+            }
+            if let Some(prior) = previous {
+                if prior >= target {
+                    return Err(GraphError::AdjacencyOrder {
+                        direction: Direction::Forward,
+                        source: source.get(),
+                        edge_index,
+                        previous: prior,
+                        next: target,
+                    });
+                }
+            }
+        }
+        Ok(DenseId::from_raw(target))
+    }
+
+    pub(crate) fn edges(self) -> impl Iterator<Item = (DenseId, DenseId)> + 'a {
+        (0..self.vertex_count).flat_map(move |source| {
+            let source = DenseId::from_raw(source);
+            self.successors_unchecked(source)
+                .iter()
+                .map(move |target| (source, DenseId::from_raw(target.get())))
+        })
+    }
+}
+
+/// Header-validated, zero-copy forward compressed-sparse-row observation.
+///
+/// The caller retains both buffers for the lifetime of this view. The target
+/// buffer contains raw dense `u32` vertices, strictly increasing within each
+/// row. Unlike owned [`CsrGraph`] construction, this boundary rejects duplicate
+/// and unsorted edges rather than sorting or copying them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BorrowedCsr<'a> {
+    vertex_count: u32,
+    offsets: &'a [u32],
+    targets: &'a [u32],
+}
+
+impl<'a> BorrowedCsr<'a> {
+    /// Checks the constant-size header and borrows forward CSR without cloning.
+    ///
+    /// Row bounds, target ranges, and strict in-row order are checked inside
+    /// the iterative SCC traversal, before each row or target is indexed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a structured [`GraphError`] for malformed dimensions, origin,
+    /// terminal offset, or edge-domain overflow. Later row/edge errors are
+    /// reported by the SCC computation, with no partial result published.
+    pub fn new(
+        vertex_count: u32,
+        offsets: &'a [u32],
+        targets: &'a [u32],
+    ) -> Result<Self, GraphError> {
+        let expected = usize::try_from(vertex_count)
+            .ok()
+            .and_then(|count| count.checked_add(1))
+            .ok_or(GraphError::VertexDomainOverflow {
+                count: u64::from(vertex_count),
+            })?;
+        if offsets.len() != expected {
+            return Err(GraphError::OffsetLength {
+                direction: Direction::Forward,
+                expected,
+                actual: offsets.len(),
+            });
+        }
+        if offsets.first().copied() != Some(0) {
+            return Err(GraphError::OffsetOrigin {
+                direction: Direction::Forward,
+                actual: offsets.first().copied(),
+            });
+        }
+        let edge_count =
+            u32::try_from(targets.len()).map_err(|_| GraphError::EdgeDomainOverflow {
+                count: targets.len() as u64,
+            })?;
+        let terminal = offsets.last().copied().unwrap_or_default();
+        if terminal != edge_count {
+            return Err(GraphError::OffsetTerminal {
+                direction: Direction::Forward,
+                expected: targets.len(),
+                actual: terminal,
+            });
+        }
+
+        Ok(Self {
+            vertex_count,
+            offsets,
+            targets,
+        })
+    }
+
+    /// Returns the dense vertex count.
+    #[must_use]
+    pub const fn vertex_count(self) -> u32 {
+        self.vertex_count
+    }
+
+    /// Returns the edge count.
+    #[must_use]
+    pub fn edge_count(self) -> usize {
+        self.targets.len()
+    }
+
+    /// Returns the original caller-owned offset buffer.
+    #[must_use]
+    pub const fn offsets(self) -> &'a [u32] {
+        self.offsets
+    }
+
+    /// Returns the original caller-owned target buffer.
+    #[must_use]
+    pub const fn targets(self) -> &'a [u32] {
+        self.targets
+    }
+
+    /// Returns the exact validation charge for a completed SCC traversal.
+    ///
+    /// The charge is one header, one row per vertex, and one target per edge.
+    #[must_use]
+    pub fn validation_work(self) -> u64 {
+        1 + u64::from(self.vertex_count) + self.targets.len() as u64
+    }
+
+    pub(crate) const fn view(self) -> ForwardCsrView<'a, u32, true> {
+        ForwardCsrView::new(self.vertex_count, self.offsets, self.targets)
+    }
+}
+
 /// Immutable canonical graph with stable identifiers and dense CSR storage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CsrGraph<K> {
@@ -516,6 +744,14 @@ impl<K: Ord> CsrGraph<K> {
 
     pub(crate) fn successors_unchecked(&self, source: DenseId) -> &[DenseId] {
         self.forward.slice(source)
+    }
+
+    pub(crate) fn forward_view(&self) -> ForwardCsrView<'_, DenseId, false> {
+        ForwardCsrView::new(
+            self.vertex_count_u32(),
+            self.forward.offsets(),
+            self.forward.targets(),
+        )
     }
 
     pub(crate) fn contains_edge(&self, source: DenseId, target: DenseId) -> bool {

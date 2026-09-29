@@ -20,7 +20,7 @@ mod traversal;
 
 pub use condensation::{Condensation, WavefrontSchedule};
 pub use control::{ExecutionControl, IncompleteReason};
-pub use csr::{BuildOptions, CsrGraph, GraphLimits, ReversePolicy};
+pub use csr::{BorrowedCsr, BuildOptions, CsrGraph, GraphLimits, ReversePolicy};
 pub use error::{ComputeError, Direction, Endpoint, GraphError};
 pub use id::{ComponentId, DenseId};
 pub use scc::{SccComponent, SccDecomposition, SccWorkProfile, SccWorkspace};

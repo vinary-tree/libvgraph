@@ -82,6 +82,17 @@ pub enum GraphError {
         /// Decreasing offset.
         next: u32,
     },
+    /// A row boundary exceeds the supplied forward target buffer.
+    OffsetOutOfRange {
+        /// CSR direction.
+        direction: Direction,
+        /// Index of the invalid offset.
+        index: usize,
+        /// Invalid offset value.
+        offset: u32,
+        /// Number of supplied targets.
+        edge_count: usize,
+    },
     /// The final CSR offset differs from the target count.
     OffsetTerminal {
         /// CSR direction.
@@ -199,6 +210,15 @@ impl fmt::Display for GraphError {
             } => write!(
                 formatter,
                 "{direction:?} offsets decrease at {index}: {previous} then {next}"
+            ),
+            Self::OffsetOutOfRange {
+                direction,
+                index,
+                offset,
+                edge_count,
+            } => write!(
+                formatter,
+                "{direction:?} offset {index} is {offset}, beyond {edge_count} targets"
             ),
             Self::OffsetTerminal {
                 direction,

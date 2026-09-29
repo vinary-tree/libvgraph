@@ -1,4 +1,6 @@
 use crate::control::{Unbounded, WorkControl};
+use crate::csr::{BorrowedCsr, ForwardCsrView};
+use crate::id::IndexId;
 use crate::radix::{
     encode_pair, logical_work as radix_logical_work, RadixWorkspace, RADIX_BUCKET_COUNT,
 };
@@ -14,6 +16,8 @@ const UNASSIGNED: u32 = u32::MAX;
 struct DfsFrame {
     vertex: DenseId,
     next_successor: usize,
+    end_successor: usize,
+    previous_target: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -21,6 +25,12 @@ struct TarjanSummary {
     component_count: u32,
     peak_active_slots: usize,
     peak_frame_slots: usize,
+}
+
+#[derive(Default)]
+struct TraversalPeaks {
+    active_slots: usize,
+    frame_slots: usize,
 }
 
 struct PartitionParts {
@@ -85,6 +95,7 @@ impl SccComponent {
 pub struct SccWorkProfile {
     vertex_count: u64,
     edge_count: u64,
+    validation_work: u64,
     component_count: u64,
     quotient_candidate_count: u64,
     quotient_edge_count: u64,
@@ -101,25 +112,27 @@ impl SccWorkProfile {
     fn complete(
         vertex_count: u64,
         edge_count: u64,
-        component_count: u64,
+        validation_work: u64,
+        tarjan: TarjanSummary,
         quotient_candidate_count: u64,
         quotient_edge_count: u64,
-        peak_active_slots: usize,
-        peak_frame_slots: usize,
     ) -> Self {
+        let component_count = u64::from(tarjan.component_count);
         let tarjan_work = 5 * vertex_count + edge_count;
         let partition_work = 10 * vertex_count + edge_count + 3 * component_count + 1;
         let radix_work = radix_logical_work(quotient_candidate_count);
         let condensation_work = 5 * component_count + 3 * quotient_edge_count + 2;
-        let decomposition_work = partition_work + edge_count + radix_work + condensation_work;
+        let decomposition_work =
+            validation_work + partition_work + edge_count + radix_work + condensation_work;
         Self {
             vertex_count,
             edge_count,
+            validation_work,
             component_count,
             quotient_candidate_count,
             quotient_edge_count,
-            peak_active_slots,
-            peak_frame_slots,
+            peak_active_slots: tarjan.peak_active_slots,
+            peak_frame_slots: tarjan.peak_frame_slots,
             tarjan_work,
             partition_work,
             radix_work,
@@ -138,6 +151,12 @@ impl SccWorkProfile {
     #[must_use]
     pub const fn edge_count(self) -> u64 {
         self.edge_count
+    }
+
+    /// Returns fused borrowed-input validation work, or zero for owned CSR.
+    #[must_use]
+    pub const fn validation_work(self) -> u64 {
+        self.validation_work
     }
 
     /// Returns the SCC count.
@@ -316,7 +335,7 @@ impl SccWorkspace {
         &mut self,
         graph: &CsrGraph<K>,
     ) -> Result<SccDecomposition, ComputeError> {
-        self.compute_impl(graph, &mut Unbounded)
+        self.compute_impl(graph.forward_view(), &mut Unbounded)
     }
 
     /// Computes an exact decomposition under deterministic work and
@@ -331,18 +350,56 @@ impl SccWorkspace {
         graph: &CsrGraph<K>,
         control: ExecutionControl<'_>,
     ) -> Result<SccDecomposition, ComputeError> {
-        self.compute_impl(graph, &mut control.meter())
+        self.compute_impl(graph.forward_view(), &mut control.meter())
     }
 
-    fn compute_impl<K: Ord, C: WorkControl>(
+    /// Computes directly over a caller-owned forward CSR buffer.
+    ///
+    /// The input buffers are never cloned or re-canonicalized. This method
+    /// reuses the same iterative Tarjan, quotient, and workspace as owned CSR.
+    ///
+    /// # Errors
+    ///
+    /// Returns an incomplete result on a work/cancellation boundary, or a
+    /// structured invalid result if a row, target, or internal invariant fails.
+    pub fn compute_borrowed(
         &mut self,
-        graph: &CsrGraph<K>,
+        graph: &BorrowedCsr<'_>,
+    ) -> Result<SccDecomposition, ComputeError> {
+        self.compute_impl(graph.view(), &mut Unbounded)
+    }
+
+    /// Computes borrowed SCCs under deterministic work/cancellation control.
+    ///
+    /// No partially constructed decomposition is published on failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ComputeError::Incomplete`] on a control boundary, or
+    /// [`ComputeError::Invalid`] on a row, target, or internal invariant failure.
+    pub fn compute_borrowed_with_control(
+        &mut self,
+        graph: &BorrowedCsr<'_>,
+        control: ExecutionControl<'_>,
+    ) -> Result<SccDecomposition, ComputeError> {
+        self.compute_impl(graph.view(), &mut control.meter())
+    }
+
+    fn compute_impl<I: IndexId, const CHECK: bool, C: WorkControl>(
+        &mut self,
+        graph: ForwardCsrView<'_, I, CHECK>,
         control: &mut C,
     ) -> Result<SccDecomposition, ComputeError> {
-        let vertex_count = graph.vertex_count();
-        let vertex_count_u32 = graph.vertex_count_u32();
+        let vertex_count_u32 = graph.vertex_count();
+        let vertex_count = vertex_count_u32 as usize;
         let vertex_count_u64 = u64::from(vertex_count_u32);
         let edge_count_u64 = graph.edge_count() as u64;
+        let validation_work = if CHECK {
+            control.step()?;
+            1 + vertex_count_u64 + edge_count_u64
+        } else {
+            0
+        };
         self.prepare(vertex_count, vertex_count_u64, control)?;
         let tarjan = self.run_tarjan(graph, vertex_count_u64, control)?;
         let mut partition =
@@ -352,11 +409,10 @@ impl SccWorkspace {
         let profile = SccWorkProfile::complete(
             vertex_count_u64,
             edge_count_u64,
-            u64::from(tarjan.component_count),
+            validation_work,
+            tarjan,
             quotient.candidate_count,
             quotient.quotient_edge_count,
-            tarjan.peak_active_slots,
-            tarjan.peak_frame_slots,
         );
         if control
             .consumed()
@@ -394,38 +450,30 @@ impl SccWorkspace {
         Ok(())
     }
 
-    fn run_tarjan<K: Ord, C: WorkControl>(
+    fn run_tarjan<I: IndexId, const CHECK: bool, C: WorkControl>(
         &mut self,
-        graph: &CsrGraph<K>,
+        graph: ForwardCsrView<'_, I, CHECK>,
         vertex_count: u64,
         control: &mut C,
     ) -> Result<TarjanSummary, ComputeError> {
         let mut next_index = 0u32;
-        let mut peak_active_slots = 0usize;
-        let mut peak_frame_slots = 0usize;
-        for raw_start in 0..graph.vertex_count_u32() {
+        let mut peaks = TraversalPeaks::default();
+        for raw_start in 0..graph.vertex_count() {
             control.step()?;
             let start = DenseId::from_raw(raw_start);
             if self.discovery[start.index()] != UNVISITED {
                 continue;
             }
             self.discover(
+                &graph,
                 start,
                 &mut next_index,
                 vertex_count,
-                &mut peak_active_slots,
-                &mut peak_frame_slots,
+                &mut peaks,
                 control,
             )?;
             while !self.frames.is_empty() {
-                self.advance_frame(
-                    graph,
-                    &mut next_index,
-                    vertex_count,
-                    &mut peak_active_slots,
-                    &mut peak_frame_slots,
-                    control,
-                )?;
+                self.advance_frame(&graph, &mut next_index, vertex_count, &mut peaks, control)?;
             }
         }
         if !self.active.is_empty() {
@@ -441,20 +489,24 @@ impl SccWorkspace {
         })?;
         Ok(TarjanSummary {
             component_count,
-            peak_active_slots,
-            peak_frame_slots,
+            peak_active_slots: peaks.active_slots,
+            peak_frame_slots: peaks.frame_slots,
         })
     }
 
-    fn discover<C: WorkControl>(
+    fn discover<I: IndexId, const CHECK: bool, C: WorkControl>(
         &mut self,
+        graph: &ForwardCsrView<'_, I, CHECK>,
         vertex: DenseId,
         next_index: &mut u32,
         vertex_count: u64,
-        peak_active_slots: &mut usize,
-        peak_frame_slots: &mut usize,
+        peaks: &mut TraversalPeaks,
         control: &mut C,
     ) -> Result<(), ComputeError> {
+        if CHECK {
+            control.step()?;
+        }
+        let (row_start, row_stop) = graph.checked_row_bounds(vertex)?;
         control.step()?;
         let discovery_index = *next_index;
         *next_index = next_index
@@ -467,20 +519,21 @@ impl SccWorkspace {
         self.active.push(vertex);
         self.frames.push(DfsFrame {
             vertex,
-            next_successor: 0,
+            next_successor: row_start,
+            end_successor: row_stop,
+            previous_target: None,
         });
-        *peak_active_slots = (*peak_active_slots).max(self.active.len());
-        *peak_frame_slots = (*peak_frame_slots).max(self.frames.len());
+        peaks.active_slots = peaks.active_slots.max(self.active.len());
+        peaks.frame_slots = peaks.frame_slots.max(self.frames.len());
         Ok(())
     }
 
-    fn advance_frame<K: Ord, C: WorkControl>(
+    fn advance_frame<I: IndexId, const CHECK: bool, C: WorkControl>(
         &mut self,
-        graph: &CsrGraph<K>,
+        graph: &ForwardCsrView<'_, I, CHECK>,
         next_index: &mut u32,
         vertex_count: u64,
-        peak_active_slots: &mut usize,
-        peak_frame_slots: &mut usize,
+        peaks: &mut TraversalPeaks,
         control: &mut C,
     ) -> Result<(), ComputeError> {
         let frame = self
@@ -490,13 +543,16 @@ impl SccWorkspace {
             .ok_or(GraphError::InvalidPartition {
                 reason: "Tarjan attempted to advance an absent frame",
             })?;
-        let successors = graph.successors_unchecked(frame.vertex);
-        if frame.next_successor == successors.len() {
+        if frame.next_successor == frame.end_successor {
             return self.finish_vertex(frame.vertex, vertex_count, control);
         }
 
+        if CHECK {
+            control.step()?;
+        }
         control.step()?;
-        let successor = successors[frame.next_successor];
+        let successor =
+            graph.checked_target(frame.vertex, frame.next_successor, frame.previous_target)?;
         let current = self.frames.last_mut().ok_or(GraphError::InvalidPartition {
             reason: "the current Tarjan frame disappeared",
         })?;
@@ -507,15 +563,9 @@ impl SccWorkspace {
                 .ok_or(GraphError::InvalidPartition {
                     reason: "a Tarjan successor cursor overflowed",
                 })?;
+        current.previous_target = Some(successor.get());
         if self.discovery[successor.index()] == UNVISITED {
-            self.discover(
-                successor,
-                next_index,
-                vertex_count,
-                peak_active_slots,
-                peak_frame_slots,
-                control,
-            )?;
+            self.discover(graph, successor, next_index, vertex_count, peaks, control)?;
         } else if self.raw_component_of[successor.index()] == UNASSIGNED {
             self.low_link[frame.vertex.index()] =
                 self.low_link[frame.vertex.index()].min(self.discovery[successor.index()]);
@@ -680,9 +730,9 @@ impl SccWorkspace {
         Ok(members)
     }
 
-    fn build_quotient<K: Ord, C: WorkControl>(
+    fn build_quotient<I: IndexId, const CHECK: bool, C: WorkControl>(
         &mut self,
-        graph: &CsrGraph<K>,
+        graph: ForwardCsrView<'_, I, CHECK>,
         component_count: u32,
         partition: &mut PartitionParts,
         control: &mut C,
@@ -747,6 +797,31 @@ impl SccDecomposition {
         control: ExecutionControl<'_>,
     ) -> Result<Self, ComputeError> {
         SccWorkspace::default().compute_with_control(graph, control)
+    }
+
+    /// Computes the exact SCC quotient over caller-owned forward CSR.
+    ///
+    /// This entry point allocates no copy of the input offsets or targets and
+    /// uses the same iterative Tarjan machine as [`Self::compute`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ComputeError::Invalid`] if a row, target, or internal invariant fails.
+    pub fn compute_borrowed(graph: &BorrowedCsr<'_>) -> Result<Self, ComputeError> {
+        SccWorkspace::default().compute_borrowed(graph)
+    }
+
+    /// Computes borrowed SCCs with a caller-owned work/cancellation control.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ComputeError::Incomplete`] on a control boundary, or
+    /// [`ComputeError::Invalid`] if a row, target, or internal invariant fails.
+    pub fn compute_borrowed_with_control(
+        graph: &BorrowedCsr<'_>,
+        control: ExecutionControl<'_>,
+    ) -> Result<Self, ComputeError> {
+        SccWorkspace::default().compute_borrowed_with_control(graph, control)
     }
 
     /// Returns components ordered by their least dense member.
