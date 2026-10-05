@@ -44,6 +44,15 @@ verify_tla() {
   rg -q 'Model checking completed. No error has been found' "$evidence_directory/tlc.log"
 }
 
+verify_lockfile() {
+  cd "$repository_root/formal/tla"
+  tla2sany PortableLockfile.tla 2>&1 | tee "$evidence_directory/lockfile-tla-syntax.log"
+  tlc -config PortableLockfile.cfg PortableLockfile.tla 2>&1 \
+    | tee "$evidence_directory/lockfile-tlc.log"
+  rg -q 'Model checking completed. No error has been found' \
+    "$evidence_directory/lockfile-tlc.log"
+}
+
 verify_exhaustive_model() {
   rustc --edition=2021 -D warnings -O "$repository_root/formal/model/exhaustive_graphs.rs" \
     -o "$evidence_directory/exhaustive-graphs"
@@ -90,6 +99,9 @@ case "${1:-all}" in
   tla)
     verify_tla
     ;;
+  lockfile)
+    verify_lockfile
+    ;;
   model)
     verify_exhaustive_model
     ;;
@@ -103,12 +115,13 @@ case "${1:-all}" in
     "$repository_root/scripts/verify-formal.sh" boundary
     "$repository_root/scripts/verify-formal.sh" rocq
     "$repository_root/scripts/verify-formal.sh" tla
+    "$repository_root/scripts/verify-formal.sh" lockfile
     "$repository_root/scripts/verify-formal.sh" model
     "$repository_root/scripts/verify-formal.sh" verus
     "$repository_root/scripts/verify-formal.sh" kani
     ;;
   *)
-    printf '%s\n' 'usage: scripts/verify-formal.sh [all|boundary|rocq|tla|model|verus|kani]' >&2
+    printf '%s\n' 'usage: scripts/verify-formal.sh [all|boundary|rocq|tla|lockfile|model|verus|kani]' >&2
     exit 2
     ;;
 esac

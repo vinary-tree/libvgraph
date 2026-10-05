@@ -17,6 +17,14 @@ The formal artifacts precede production implementation.
 - `tla/IterativeGraphMachine.tla` models a finite explicit-frame traversal with completion and
   cancellation. TLC checks type, ownership, uniqueness, frame bounds, exact discovery/edge/frame
   work accounting, linear work, and exact completed-state work.
+- `tla/PortableLockfile.tla` models the release admission boundary for tracked lockfiles.
+  The model begins with any subset of lockfiles carrying ambient patch metadata. Introducing or
+  removing a patch invalidates an earlier clean-source certificate; certification and publication
+  require a clean set. TLC checks type correctness, certified-state cleanliness, published-state
+  cleanliness, and publication only after certification. The two-lockfile configuration exhausts
+  the root and fuzz lockfile states. This is a state-machine proof boundary, not a parser proof:
+  the production guard and its mutation/property tests must refine the model's ambient-patch
+  observation for every tracked Cargo lockfile.
 - `model/exhaustive_graphs.rs` enumerates all directed graphs through four vertices, validates
   canonical forward/reverse CSR, compares the iterative SCC model with independent transitive
   closure, checks every vertex permutation together with its induced condensation and ranks, and
@@ -39,12 +47,14 @@ Run:
 scripts/verify-formal.sh
 ```
 
-The default command checks all six layers. Each layer runs in a transient systemd user scope with
+The default command checks all seven layers. Each layer runs in a transient systemd user scope with
 `MemorySwapMax=0`, one Cargo build job, and an explicit resident-memory ceiling. Rocq, TLA+/TLC,
 the exhaustive model, and Verus receive 4 GiB; Kani/CBMC receives 2 GiB. A cap hit is a failed
 proof gate and must be addressed by reducing verifier state, not by silently increasing the cap.
 Every scope uses a 100% CPU quota and a repository-backed temporary directory. Java and the TLA+
 launcher receive the same repository-local temporary path.
+Run `scripts/verify-formal.sh lockfile` to check only the lockfile admission model before editing
+production lockfiles or the release guard.
 
 The command writes transient evidence below `target/verification`. Record commands, versions,
 result summaries, peak memory, and SHA-256 hashes in pgmcp before deleting those files.
