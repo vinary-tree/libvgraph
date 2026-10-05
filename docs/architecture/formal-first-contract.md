@@ -15,14 +15,36 @@ contract.
 |---|---|---|
 | Relational and resource semantics | `formal/rocq/GraphQuotient.v` | Fibers, quotient edges, acyclicity, renaming, enumeration, wavefront laws, exact logical work, linear heap space, and constant native control depth |
 | Lifecycle model | `formal/tla/IterativeGraphMachine.tla` | Explicit frames, bounded frame count, exact discovery/edge/frame accounting, linear work, completion, and cancellation |
+| Lockfile admission model | `formal/tla/PortableLockfile.tla` | Tracked-lockfile cleanliness, certificate invalidation after a patch change, and publication only from a clean certified state |
 | Exhaustive oracle | `formal/model/exhaustive_graphs.rs` | Canonical forward/reverse CSR, every graph through four vertices, independent SCC oracle, all renamings, induced condensation/rank/flat-wave equivalence, adversarial enumerations, exact work and returned-buffer counters, and a small-stack deep graph |
 | Arithmetic refinement | `formal/verus/flat_wave_refinement.rs` | Rank-fiber partition laws, flat storage, exact schedule work, integer-domain safety, and the phase-complete uniform bound |
 | Production refinement | Rust tests and Kani harnesses | CSR validation, iterative Tarjan parity, stable ordering, malformed-input behavior, concrete overflow and fail-atomic checks, measured work/allocation bounds, recursion census, and small-stack lifecycle |
 | Dependency boundary | `scripts/check-core-boundary.sh` | Kernel metadata and sources contain no serialization dependency, feature, codec, schema, hash, or provenance implementation |
+| Portable resolution boundary | `scripts/check-lockfile-portability.sh` | Every tracked `Cargo.lock` is a readable regular file without Cargo's ambient `[[patch.unused]]` metadata; the check fails closed if lockfile enumeration fails |
 
 The first three layers preceded production implementation. Verus and Kani connect the general
 resource contract and concrete Rust operations during refinement. Every layer is required for the
 complete gate.
+
+The lockfile admission model was checked before changing the production lockfile or guard. Its
+finite configuration covers both tracked lockfiles (`Cargo.lock` and `fuzz/Cargo.lock`). It does not
+prove a TOML parser. The guard scans Cargo's flat lockfile table headers in linear time, and the
+Rust properties exercise the guard's concrete observation. The independent Git enumeration
+ensures a newly tracked lockfile cannot silently escape the check. This boundary does not change
+the user's global Cargo configuration; a local `[[patch.unused]]` artifact is rejected even when
+Cargo itself accepts it.
+
+| Model invariant | Concrete property or gate |
+|---|---|
+| `TypeOK` | Generated transition traces keep the ambient-lockfile set within the root/fuzz domain; both generated files are checked against the guard |
+| `CertifiedImpliesClean` | A clean file is accepted, adding an ambient patch rejects it, and removing the patch restores acceptance; transition traces invalidate certification on every change |
+| `PublishedImpliesClean` | Generated publication traces allow publication only when both lockfiles pass the guard; the repository gate applies the predicate to every tracked lockfile |
+| `PublishedImpliesCertified` | Generated traces cannot reach publication without a preceding clean certification step |
+
+Run `scripts/verify-formal.sh lockfile` before a lockfile or guard change, then
+`scripts/check-lockfile-portability.sh` and `cargo test --locked --test lockfile_portability` as the
+implementation refinement. A new lockfile-resolution mechanism needs a new formal observation
+and corresponding mutation properties before it can replace this guard.
 
 ## Public boundary reserved by the contract
 
@@ -64,6 +86,8 @@ An implementation release is admitted only when all answers are “yes.”
     excluding returned partition, condensation, and schedule values?
 14. Does a source and call-graph census establish zero recursive control edges on every public
     input-depth-sensitive path?
+15. Are all tracked Cargo lockfiles free of ambient patch metadata, with all four lockfile-model
+    invariants refined by the lockfile property tests and the repository admission guard?
 
 The symbols $`V`$ and $`E`$ denote source vertices and canonical source edges. The symbol $`R`$
 denotes cross-component candidates before quotient deduplication. The symbols $`C`$, $`Q`$, and

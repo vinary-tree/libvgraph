@@ -34,6 +34,8 @@ ordering cost is never conflated with graph-analysis complexity.
 Run `scripts/verify-formal.sh all` before changing production semantics. The runner places every
 heavy proof layer in an explicit no-swap systemd memory scope. Run `scripts/verify-docs.sh` for
 every documentation update.
+For release admission, `scripts/check-lockfile-portability.sh` checks every tracked Cargo lockfile
+for ambient patch metadata without changing global Cargo configuration.
 
 ## Status
 

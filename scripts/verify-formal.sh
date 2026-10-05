@@ -24,6 +24,7 @@ fi
 
 verify_boundary() {
   LIBVGRAPH_BOUNDARY_SCOPED=1 "$repository_root/scripts/check-core-boundary.sh"
+  bash "$repository_root/scripts/check-lockfile-portability.sh"
 }
 
 verify_rocq() {
