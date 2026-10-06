@@ -54,6 +54,41 @@ verify_tla_core() {
   rg -q 'Model checking completed. No error has been found' "$evidence_directory/tlc.log"
 }
 
+verify_tla_lockfile() {
+  cd "$repository_root/formal/tla"
+  tla2sany PortableLockfile.tla 2>&1 \
+    | tee "$evidence_directory/lockfile-tla-syntax.log"
+  tlc -workers 1 -deadlock \
+    -metadir "$evidence_directory/lockfile-tlc-positive-state" \
+    -config PortableLockfile.cfg PortableLockfile.tla 2>&1 \
+    | tee "$evidence_directory/lockfile-tlc-positive.log"
+  rg -q 'Model checking completed. No error has been found' \
+    "$evidence_directory/lockfile-tlc-positive.log"
+
+  local configurations=(
+    PortableLockfileSkipEnumeration.cfg
+    PortableLockfileIgnoreReadError.cfg
+  )
+  local labels=(enumeration read-error)
+  local invariants=(CertifiedHasCompleteEnumeration CertifiedHasReadableLockfiles)
+  local index
+  for index in "${!configurations[@]}"; do
+    local log="$evidence_directory/lockfile-tlc-mutant-${labels[$index]}.log"
+    set +e
+    tlc -workers 1 -deadlock \
+      -metadir "$evidence_directory/lockfile-tlc-mutant-${labels[$index]}-state" \
+      -config "${configurations[$index]}" PortableLockfile.tla 2>&1 | tee "$log"
+    local status="${PIPESTATUS[0]}"
+    set -e
+    if [[ "$status" -eq 0 ]]; then
+      printf 'lockfile %s mutant unexpectedly satisfied the model\n' \
+        "${labels[$index]}" >&2
+      return 1
+    fi
+    rg -q "Invariant ${invariants[$index]} is violated" "$log"
+  done
+}
+
 verify_tla_interop() {
   cd "$repository_root/formal/tla"
   tla2sany InteropCodecMachine.tla 2>&1 \
@@ -151,6 +186,7 @@ verify_tla_release() {
 
 verify_tla() {
   verify_tla_core
+  verify_tla_lockfile
   verify_tla_interop
   verify_tla_release
 }
@@ -268,6 +304,9 @@ case "${1:-all}" in
   interop-tla)
     verify_tla_interop
     ;;
+  lockfile-tla)
+    verify_tla_lockfile
+    ;;
   release-tla)
     verify_tla_release
     ;;
@@ -311,7 +350,7 @@ case "${1:-all}" in
     ;;
   *)
     printf '%s\n' \
-      'usage: scripts/verify-formal.sh [all|boundary|rocq|tla|model|verus|kani|interop|interop-rocq|interop-tla|release-tla|interop-model|interop-verus|interop-smt|interop-invariants|interop-required-red]' \
+      'usage: scripts/verify-formal.sh [all|boundary|rocq|tla|lockfile-tla|model|verus|kani|interop|interop-rocq|interop-tla|release-tla|interop-model|interop-verus|interop-smt|interop-invariants|interop-required-red]' \
       >&2
     exit 2
     ;;

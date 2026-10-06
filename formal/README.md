@@ -17,6 +17,17 @@ The formal artifacts precede production implementation.
 - `tla/IterativeGraphMachine.tla` models a finite explicit-frame traversal with completion and
   cancellation. TLC checks type, ownership, uniqueness, frame bounds, exact discovery/edge/frame
   work accounting, linear work, and exact completed-state work.
+- `tla/PortableLockfile.tla` models release admission over the two tracked Cargo lockfiles.
+  A successful Git enumeration returns the complete tracked set; a failed enumeration can emit
+  a nonempty prefix. Each lockfile can independently contain ambient patch metadata or be
+  unreadable. The guard may certify only after successful enumeration, nonempty complete coverage,
+  readable lockfiles, and absence of ambient patches. Any changed input or repeated enumeration
+  invalidates the earlier certificate; publication requires a current certificate. TLC checks six
+  state invariants. Two causal configurations must violate the targeted invariant when the
+  enumeration-result check or the read-error check is removed. The Git-completeness assumption
+  applies only to a successful `git ls-files`; the concrete guard must reject every nonzero Git
+  exit status, even after partial output. This model is not a TOML parser proof: shell and Rust
+  mutation properties refine its concrete lockfile observation.
 - `model/exhaustive_graphs.rs` enumerates all directed graphs through four vertices, validates
   canonical forward/reverse CSR, compares the iterative SCC model with independent transitive
   closure, checks every vertex permutation together with its induced condensation and ranks, and
