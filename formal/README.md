@@ -17,6 +17,17 @@ The formal artifacts precede production implementation.
 - `tla/IterativeGraphMachine.tla` models a finite explicit-frame traversal with completion and
   cancellation. TLC checks type, ownership, uniqueness, frame bounds, exact discovery/edge/frame
   work accounting, linear work, and exact completed-state work.
+- `tla/PortableLockfile.tla` models release admission over two representative Cargo lockfiles.
+  A successful Git enumeration returns the complete tracked set; a failed enumeration can emit
+  a nonempty prefix. Each lockfile can independently contain ambient patch metadata or be
+  unreadable. The guard may certify only after successful enumeration, nonempty complete coverage,
+  readable lockfiles, and absence of ambient patches. Any changed input or repeated enumeration
+  invalidates the earlier certificate; publication requires a current certificate. TLC checks six
+  state invariants. Two causal configurations must violate the targeted invariant when the
+  enumeration-result check or the read-error check is removed. The Git-completeness assumption
+  applies only to a successful `git ls-files`; the concrete guard must reject every nonzero Git
+  exit status, even after partial output. This model is not a TOML parser proof: shell and Rust
+  mutation properties refine its concrete lockfile observation.
 - `model/exhaustive_graphs.rs` enumerates all directed graphs through four vertices, validates
   canonical forward/reverse CSR, compares the iterative SCC model with independent transitive
   closure, checks every vertex permutation together with its induced condensation and ranks, and
@@ -59,6 +70,36 @@ The formal artifacts precede production implementation.
 - `verus/interop_refinement.rs` proves six Rust-shaped arithmetic, admission, cursor,
   and work refinements. `doc/interop-invariants.tsv` maps 76 obligations bijectively onto
   fifteen required-red production properties.
+
+## Lockfile guard refinement
+
+A *certificate* here means only that the release-admission guard returned success for the
+tracked lockfiles. It is not a publication event. The finite TLA+ model permits Git to emit a
+nonempty prefix and then fail, and permits the lockfile reader to fail independently. The concrete
+guard accepts a lockfile only when a regular non-symlink file produces grep status 1, meaning a
+completed search found no `[[patch.unused]]` header. Status 0 means the header was found; every
+other status means the observation failed. Git enumeration is consumed only after its exit status
+is 0, and the successful result must contain at least one tracked lockfile.
+
+| Model invariant | Concrete refinement and acceptance evidence |
+| --- | --- |
+| `TypeOK` | TLC checks each finite state component; the Rust property test varies both external exit statuses over 0–3 and the emitted-path Boolean. |
+| `CertifiedHasCompleteEnumeration` | The checked Git command, nonempty-path test, and property cases reject a nonzero status even after `Cargo.lock` has been emitted. |
+| `CertifiedHasReadableLockfiles` | The tri-state grep check and property cases accept status 1 only; a status-2 read error has a named regression test. |
+| `CertifiedHasNoAmbientPatch` | A grep match rejects admission; the guard also constructs and rejects an ambient-patch mutant for every tracked lockfile. |
+| `PublishedOnlyAfterCertificate` | The `PortableLockfile.tla` publication action requires its certificate. The shell test proves guard admission only; it does not verify a concrete publisher invokes the guard. `ReleaseMachine.tla` independently checks generic publication gates. |
+| `PublishedHasPortableSource` | The model checks the source conjunction at modeled publication. The 32-case bounded matrix and randomized Rust property test check only the concrete guard-admission conjunction. |
+
+Run the concrete refinement tests with:
+
+```bash
+cargo test --locked --offline --test lockfile_guard_properties
+```
+
+The fake Git and grep executables inject failures without changing tracked files. This fault
+injection tests command-status handling; it does not establish the
+semantic completeness of a successful Git response or prove TOML parsing. Those remain explicit
+boundary assumptions, not hidden conclusions of the state-machine proof.
 
 Run:
 
