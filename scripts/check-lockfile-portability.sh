@@ -9,10 +9,17 @@ trap 'rm -rf -- "$run_directory"' EXIT
 
 lockfile_has_repository_only_resolution() {
   local lockfile="$1"
-  [[ -f "$lockfile" && ! -L "$lockfile" ]] \
-    && ! LC_ALL=C grep -E -q \
+  if [[ ! -f "$lockfile" || -L "$lockfile" ]]; then
+    return 1
+  fi
+  if LC_ALL=C grep -E -q \
       '^[[:space:]]*\[\[patch[.]unused\]\][[:space:]]*(#.*)?$' \
-      "$lockfile"
+      "$lockfile"; then
+    return 1
+  else
+    # grep returns 1 only for a successful read with no matching header.
+    [[ "$?" -eq 1 ]]
+  fi
 }
 
 if lockfile_has_repository_only_resolution "$run_directory/missing-Cargo.lock"; then
@@ -20,9 +27,13 @@ if lockfile_has_repository_only_resolution "$run_directory/missing-Cargo.lock"; 
   exit 1
 fi
 
-mapfile -d '' -t tracked_lockfiles < <(
-  git -C "$repository_root" ls-files -z -- '*Cargo.lock'
-)
+tracked_paths="$run_directory/tracked-lockfiles"
+if ! git -c core.fsmonitor=false -C "$repository_root" \
+    ls-files -z -- '*Cargo.lock' > "$tracked_paths"; then
+  printf '%s\n' 'could not enumerate tracked Cargo lockfiles' >&2
+  exit 1
+fi
+mapfile -d '' -t tracked_lockfiles < "$tracked_paths"
 if [[ "${#tracked_lockfiles[@]}" -eq 0 ]]; then
   printf '%s\n' 'lockfile portability verification found no tracked Cargo lockfiles' >&2
   exit 1
@@ -32,7 +43,7 @@ index=0
 for tracked_lockfile in "${tracked_lockfiles[@]}"; do
   lockfile="$repository_root/$tracked_lockfile"
   if ! lockfile_has_repository_only_resolution "$lockfile"; then
-    printf 'tracked lockfile contains ambient unused-patch state: %s\n' \
+    printf 'tracked lockfile is unreadable, non-regular, or contains ambient unused-patch state: %s\n' \
       "$tracked_lockfile" >&2
     exit 1
   fi
